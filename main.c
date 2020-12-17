@@ -29,15 +29,16 @@ void init() {
 	// x gridlines
 	int xMargin, xGridWidth;
 	getBounds(COLS, &xMargin, &xGridWidth);
-	const int x1 = xMargin + xGridWidth + 1;
+	const int x1 = xMargin + xGridWidth;
 	const int x2 = COLS - xMargin - xGridWidth;
 
 	// y gridlines
 	int yMargin, yGridWidth;
 	getBounds(LINES, &yMargin, &yGridWidth);
-	const int y1 = yMargin + yGridWidth + 1;
+	const int y1 = yMargin + yGridWidth;
 	const int y2 = LINES - yMargin - yGridWidth;
 
+	printw("COLS: %i\nLINES: %i\nxMargin: %i\nxGridWidth: %i\nyMargin: %i\nyGridWidth: %i\ny1: %i\ny2: %i", COLS, LINES, xMargin, xGridWidth, yMargin, yGridWidth, y1, y2);
 	// draw the gridlines
 	mvhline(y1, xMargin, '-', COLS - 2 * xMargin);
 	mvhline(y2, xMargin, '-', COLS - 2 * xMargin);
