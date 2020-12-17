@@ -2,36 +2,56 @@
 #include <stdio.h>
 #include <unistd.h>
 
-// also includes '+' for intersections with vertical seperators
-void horizontalSeperators(const int y, const int l) {
-	mvhline(y, COLS / 3, '-', l);
-	mvaddch(y, COLS / 3 + l, '+');
-	mvhline(y, COLS / 3 + l + 1, '-', l);
-	mvaddch(y, COLS / 3 + 2 * l + 1, '+');
-	mvhline(y, COLS / 3 + 2 * l + 2, '-', l);
-}
+// d is the length of the dimension
+// margin length and grid length will be stored in *margin, *length
+void getBounds(int d, int * const margin, int * const length) {
+	// first figure out bounds of box
+	*margin = d / 6;
+	const int modLimit = 2;
+	if (d % 6 < modLimit) { // if mod greater than modLimit I want to make the margins bigger
+		*margin = d / 6;
+	}
+	else {
+		*margin = d / 6 + 1;
+	}
 
-void verticalSeperators(int x, const int l) {
-	mvvline(LINES / 3, x, '|', l);
-	mvvline(LINES / 3 + l + 1, x, '|', l);
-	mvvline(LINES / 3 + 2 * l + 2, x, '|', l);
+	// now figure out grid sizes
+	d -= 2 * *margin + 2; // inner length = total length - 2 * *margin - 2 (-2 for the gridline widths)
+	if (d % 3 == 2) { // mod 2 means extra space symmetryically on either side of center
+		*length = d / 3 + 1;
+	}
+	else {
+		*length = d / 3;
+	}	
 }
 
 void init() {
-	// grid will take up 1/9 of screen
-	// and will be centered
-	
-	const int HOZ  = COLS / 9.0 - 2.0 / 3;  // 3 * length + 2 = DIM / 3 
-	horizontalSeperators(LINES * 4 / 9, HOZ);
-	horizontalSeperators(LINES * 5 / 9, HOZ);
+	// x gridlines
+	int xMargin, xGridWidth;
+	getBounds(COLS, &xMargin, &xGridWidth);
+	const int x1 = xMargin + xGridWidth + 1;
+	const int x2 = COLS - xMargin - xGridWidth;
 
-	const int VERT = LINES / 9.0 - 2.0 / 3;  // 3 * length + 2 = DIM / 3 
-	verticalSeperators(COLS * 4 / 9, VERT);
-	verticalSeperators(COLS * 5 / 9, VERT);
+	// y gridlines
+	int yMargin, yGridWidth;
+	getBounds(LINES, &yMargin, &yGridWidth);
+	const int y1 = yMargin + yGridWidth + 1;
+	const int y2 = LINES - yMargin - yGridWidth;
 
-	//mvhline(LINES / 2, COLS / 2 - 10, '-', 20);
-	refresh();
+	// draw the gridlines
+	mvhline(y1, xMargin, '-', COLS - 2 * xMargin);
+	mvhline(y2, xMargin, '-', COLS - 2 * xMargin);
+	mvvline(yMargin, x1, '|', LINES - 2 * yMargin);
+	mvvline(yMargin, x2, '|', LINES - 2 * yMargin);
+
+	// intersections
+	mvaddch(y1, x1, '+');
+	mvaddch(y1, x2, '+');
+	mvaddch(y2, x1, '+');
+	mvaddch(y2, x2, '+');
 }
+
+	
 
 int main() {
 	// ncurses initialization 
