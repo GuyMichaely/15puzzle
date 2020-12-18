@@ -1,60 +1,88 @@
 #include <ncurses.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 // d is the length of the dimension
 // margin length and grid length will be stored in *margin, *length
-void getBounds(int d, int * const margin, int * const length) {
-	// first figure out bounds of box
-	*margin = d / 6;
-	const int modLimit = 2;
-	if (d % 6 < modLimit) { // if mod greater than modLimit I want to make the margins bigger
-		*margin = d / 6;
-	}
-	else {
-		*margin = d / 6 + 1;
-	}
-
-	// now figure out grid sizes
-	d -= 2 * *margin + 2; // inner length = total length - 2 * *margin - 2 (-2 for the gridline widths)
-	if (d % 3 == 2) { // mod 2 means extra space symmetryically on either side of center
-		*length = d / 3 + 1;
-	}
-	else {
-		*length = d / 3;
-	}	
+int getMargin(int d){
+	const int modLimit = 1; // if d % 6 > 1 margin has enough room to be 1 bigger
+	return d / 6 + (d % 6 > modLimit);
 }
 
-void init() {
-	// x gridlines
-	int xMargin, xGridWidth;
-	getBounds(COLS, &xMargin, &xGridWidth);
-	const int x1 = xMargin + xGridWidth;
-	const int x2 = COLS - xMargin - xGridWidth;
-
-	// y gridlines
-	int yMargin, yGridWidth;
-	getBounds(LINES, &yMargin, &yGridWidth);
-	const int y1 = yMargin + yGridWidth;
-	const int y2 = LINES - yMargin - yGridWidth;
-
-	printw("COLS: %i\nLINES: %i\nxMargin: %i\nxGridWidth: %i\nyMargin: %i\nyGridWidth: %i\ny1: %i\ny2: %i", COLS, LINES, xMargin, xGridWidth, yMargin, yGridWidth, y1, y2);
-	// draw the gridlines
-	mvhline(y1, xMargin, '-', COLS - 2 * xMargin);
-	mvhline(y2, xMargin, '-', COLS - 2 * xMargin);
-	mvvline(yMargin, x1, '|', LINES - 2 * yMargin);
-	mvvline(yMargin, x2, '|', LINES - 2 * yMargin);
-
-	// intersections
-	mvaddch(y1, x1, '+');
-	mvaddch(y1, x2, '+');
-	mvaddch(y2, x1, '+');
-	mvaddch(y2, x2, '+');
+void interactiveDebug(char *w, int v) {
+	mvprintw(0, 0, "                   ");
+	mvprintw(0, 0, w, v);
+	if (getch() == 'q') {
+		endwin();
+		exit(0);
+	}
 }
 
+// given the length of the dimension and number of cells to split it into
+// stores line coordinates (relative to edge of box, not edge of screen)_in lineCoords
+void getLineCoords(int length, int cells, int lineCoords[]) {
+	// most likely won't be able to divide the grid perfectly evenly
+	// therefore spread the larger ones out throughtout the dimension
+	// symmetrically and evenly
+
+	// if there is an odd number of lines set the middle one
+	if (!(cells % 2)) {
+		lineCoords[cells / 2 - 1] = length / 2;
+	}
+
+	// iterate through gridlines out to in
+	// set each gridline symmetrically on the left and right of the center
+	for (int i = 0; i < (cells + 1) / 2 - 1; i++) {
+		lineCoords[i] = length * (i + 1) / cells;
+		lineCoords[(cells - 2) - i] = length - lineCoords[i]; // (cells - 2) bc number of lines is cells - 1
+		// then subtract 1 again to avoid overflow; cells - 2
+	}
+}
+
+// given coordinates of cell seperators
+// stores where the numbers should be placed along the dimension in cellCoords
+void getCellCoords(int firstLength, const int lineCoords[], int cellCoords[]) {
+
+}
+
+void init(int rows, int cols) {
+	int xMargin = getMargin(COLS);
+	int xLines[cols - 1];
+	getLineCoords(COLS - 2 * xMargin, cols, xLines);
+
+	int yMargin = getMargin(LINES);
+	int yLines[rows - 1];
+	getLineCoords(LINES - 2 * yMargin, rows, yLines);
+
+	for (int i = 0; i < cols - 1; i++) {
+		mvvline(yMargin, xLines[i] + xMargin, '|', LINES - 2 * yMargin);
+	}
+	for (int i = 0; i < rows - 1; i++) {
+		mvhline(yLines[i] + yMargin, xMargin, '-', COLS - 2 * xMargin);
+	}
 	
+}
 
-int main() {
+int main(int argc, char *argv[]) {
+	int cols, rows;
+	if (argc == 1) {
+		cols = rows = 2;
+	}
+	else if (argc != 3) {
+		printf("Usage: npuzzle [rows columns]\n");
+		return 1;
+	}
+	else {	
+		rows = atoi(argv[1]);
+		cols = atoi(argv[2]);
+	}
+	if (rows < 2 || cols < 2) {
+		printf("Both rows and columns must be more than 1\n");
+		return 2;
+	}
+
+
 	// ncurses initialization 
 	initscr();
 	noecho();
@@ -82,7 +110,7 @@ int main() {
 		
 	}
 	exit; */
-	init();
+	init(rows, cols);
 	char c;
 	int i;
 	while ((c = getch()) != 'q') {
