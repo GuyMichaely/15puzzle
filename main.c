@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #define interactiveDebug(...) { \
 	mvprintw(0, 0, "                                                                                                                                                                            "); \
@@ -21,6 +22,7 @@ int getMargin(int d){
 
 // given the length of the dimension and number of cells to split it into
 // stores line coordinates (relative to edge of box, not edge of screen)_in lineCoords
+// returns length of last cell
 int getCoords(int length, int cells, int lineCoords[], int cellCoords[]) {
 	// most likely won't be able to divide the grid perfectly evenly
 	// therefore spread the larger ones out throughtout the dimension
@@ -63,15 +65,6 @@ int getCoords(int length, int cells, int lineCoords[], int cellCoords[]) {
 		cellCoords[i] = (lineCoords[i] + lineCoords[i - 1] + 1) / 2;
 	}
 	
-	/*
-	interactiveDebug("length: %i", length);
-	for (int i = 0; i < cells - 1; i++) {
-		interactiveDebug("lineCoords[%i]: %i", i, lineCoords[i]);
-	}
-	for (int i = 0; i < cells; i++) {
-		interactiveDebug("cellCoords[%i]: %i", i, cellCoords[i]);
-	}
-	*/
 	return length - lineCoords[cells - 2] - 1; // - 1 because the thickness of the line takes up space
 }
 
@@ -93,47 +86,86 @@ void getOffsets(const int lines, const int lastLength, const int lineCoords[], i
 	}
 }
 
-void init(int rows, int cols) {
+// draws number at position, properly centering it
+void drawNum(int y, int x, int num, bool onRight) {
+	mvprintw(y, x - (intLength(num) - onRight) / 2, "%i", num);
+}
+
+// draws the grid and draws initial set of numbers
+// stores cell coordinates in yCells and xCells
+void init(int rows, int cols, int data[][cols], int yCells[], int xCells[]) {
+	// get xlines and xcells
 	int xLines[cols - 1];
-	int xCells[cols];
 	int xMargin = getMargin(COLS);
 	const int lastLength = getCoords(COLS - 2 * xMargin, cols, xLines, xCells);
 	int offsets[cols];
 	getOffsets(cols - 1, lastLength, xCells, offsets);
+	// the functions used return coordinates not relative to the edge of the screen
+	// loop to add that in
+	for (int i = 0; i < cols - 1; i++) {
+		xLines[i] += xMargin;
+		xCells[i] += xMargin;
+	}
+	xCells[cols - 1] += xMargin;
 
+	// get ylines and ycells
 	int yMargin = getMargin(LINES);
 	int yLines[rows - 1];
-	int yCells[rows];
 	getCoords(LINES - 2 * yMargin, rows, yLines, yCells);
+
+	for (int i = 0; i < rows - 1; i++) {
+		yLines[i] += yMargin;
+		yCells[i] += yMargin;
+	}
+	yCells[rows - 1] += yMargin;
 
 	// print gridlines
 	for (int i = 0; i < cols - 1; i++) {
-		mvvline(yMargin, xLines[i] + xMargin, '|', LINES - 2 * yMargin);
+		mvvline(yMargin, xLines[i], '|', LINES - 2 * yMargin);
 	}
 	for (int i = 0; i < rows - 1; i++) {
-		mvhline(yLines[i] + yMargin, xMargin, '-', COLS - 2 * xMargin);
+		mvhline(yLines[i], xMargin, '-', COLS - 2 * xMargin);
 	}
 	for (int x = 0; x < cols - 1; x++) {
 		for (int y = 0; y < rows - 1; y++) {
-			mvaddch(yLines[y] + yMargin, xLines[x] + xMargin, '+');
+			mvaddch(yLines[y], xLines[x], '+');
 		}
 	}
 
 	// draw numbers in cells
 	for (int y = 0; y < rows; y++) {
 		for (int x = 0; x < (cols + 1) / 2; x++) {
-			const int yCoord = yCells[y] + yMargin;
-			int xCoord = xCells[x] + xMargin;
-			xCoord -= intLength(cols * y + x) / 2;
-			mvprintw(yCoord, xCoord, "%i", cols * y + x);
+			const int v = data[y][x];
+			mvprintw(yCells[y], xCells[x] - intLength(v) / 2, "%i", v); 
 		}
 		for (int x = (cols + 1) / 2; x < cols; x++) {
-			const int yCoord = yCells[y] + yMargin;
-			int xCoord = xCells[x] + xMargin;
-			xCoord -= (intLength(cols * y + x) - 1) / 2;
-			mvprintw(yCoord, xCoord, "%i", cols * y + x);
+			const int v = data[y][x];
+			mvprintw(yCells[y], xCells[x] - (intLength(v) - 1) / 2, "%i", v);
 		}
 	}
+}
+
+// clears out cell at coordinate y, x
+void clearSpot(int y, int x, int cols, int data[][cols], int yCellCoords[], int xCellCoords[]) {
+	const int length = intLength(data[y][x]);
+	int xCoord = xCellCoords[x] - (length - (x >= ((cols + 1) / 2))) / 2;
+	mvhline(yCellCoords[y], xCoord, ' ', length);
+}
+
+// swap and redraw two values at specified coords
+void swap(int y, int x, int swapy, int swapx, int cols, int data[][cols], int yCoords[], int xCoords[]) {
+	// clear out spaces on screen
+	clearSpot(y, x, cols, data, yCoords, xCoords);
+	clearSpot(swapy, swapx, cols, data, yCoords, xCoords);
+
+	// redraw
+	drawNum(yCoords[y], xCoords[x], data[swapy][swapx], x >= (cols + 1) / 2);
+	drawNum(yCoords[swapy], xCoords[swapx], data[y][x], swapx >= (cols + 1) / 2);
+
+	// swap values in memory
+	const int temp = data[y][x];
+	data[y][x] = data[swapy][swapx];
+	data[swapy][swapx] = temp;
 }
 
 int main(int argc, char *argv[]) {
@@ -160,36 +192,69 @@ int main(int argc, char *argv[]) {
 	noecho();
 	raw();
 	keypad(stdscr, TRUE);
-	/*
-	// key detection and printw
-	int c = getch();
-	switch (c) {
-		case KEY_UP:
-		case 'k':
-			printw("Up");
-			break;
-		case KEY_DOWN:
-		case 'j':
-			printw("Down");
-			break;
-	}
-	*/
 	
-	/*
-	initial draw;
-	getch;
-	while (getch is not exit) {
-		
+	// game init
+	int cells[rows][cols];
+	for (int y = 0; y < rows; y++) {
+		for (int x = 0; x < cols; x++) {
+			cells[y][x] = y * rows + x;
+		}
 	}
-	exit; */
-	init(rows, cols);
-	char c;
-	int i;
-	while ((c = getch()) != 'q') {
-		mvaddch(0, i++, c);
-		usleep(100000);
+	int yCoords[rows];
+	int xCoords[cols];
+	init(rows, cols, cells, yCoords, xCoords);
+
+	int c;
+	int x, y;
+	x = y = 0;
+
+	// game loop
+	while ((c = getch()) != 'q' && c != 'Q') {
+		int swapx, swapy;
+		int i = 0;
+		if (c == KEY_UP || c == 'k') {
+				if (y != 0) {
+					swapy = y - 1;
+					swapx = x;
+				}
+				else {
+					continue;
+				}
+		}
+		else if (c == KEY_DOWN || c == 'j') {
+				if (y != rows - 1) {
+					swapy = y + 1;
+					swapx = x;
+				}
+				else {
+					continue;
+				}
+		}
+		else if (c == KEY_LEFT || c == 'h') {
+				if (x != 0) {
+					swapx = x - 1;
+					swapy = y;
+				}
+				else {
+					continue;
+				}
+		}
+		else if (c == KEY_RIGHT || c == 'l') {
+				if (x != cols - 1) {
+					swapx = x + 1;
+					swapy = y;
+				}
+				else {
+					continue;
+				}
+		}
+		else {
+				continue;
+		}
+		swap(y, x, swapy, swapx, cols, cells, yCoords, xCoords);
+		x = swapx;
+		y = swapy;
+		refresh();
 	}
 	endwin();
 }
-
-
