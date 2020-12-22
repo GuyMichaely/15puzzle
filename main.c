@@ -1,6 +1,5 @@
 #include <ncurses.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <stdbool.h>
 
@@ -48,9 +47,9 @@ int getCoords(int length, int cells, int lineCoords[], int cellCoords[]) {
 	// if there's an odd number of lines
 	// it can happen that the (n / 2 + 1)th section is too large
 	// check and account for that
-	if (!(cells % 2)) {
+	if (cells != 2 && !(cells % 2)) {
 		const int middle = cells / 2 - 1;
-		if (lineCoords[middle + 2] - lineCoords[middle + 1] > 1) {
+		if ((lineCoords[middle + 1] - lineCoords[middle]) - (lineCoords[middle + 2] - lineCoords[middle + 1]) > 1) {
 			lineCoords[middle + 1]--;
 		}
 	}
