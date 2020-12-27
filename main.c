@@ -211,7 +211,10 @@ int main(int argc, char *argv[]) {
 	while ((c = getch()) != 'q' && c != 'Q') {
 		int swapx, swapy;
 		int i = 0;
-		if (c == KEY_UP || c == 'k') {
+		
+		switch (c) {
+			case KEY_UP:
+			case 'k':
 				if (y != 0) {
 					swapy = y - 1;
 					swapx = x;
@@ -219,8 +222,9 @@ int main(int argc, char *argv[]) {
 				else {
 					continue;
 				}
-		}
-		else if (c == KEY_DOWN || c == 'j') {
+				break;
+			case KEY_DOWN:
+			case 'j':
 				if (y != rows - 1) {
 					swapy = y + 1;
 					swapx = x;
@@ -228,8 +232,9 @@ int main(int argc, char *argv[]) {
 				else {
 					continue;
 				}
-		}
-		else if (c == KEY_LEFT || c == 'h') {
+				break;
+			case KEY_LEFT:
+			case 'h':
 				if (x != 0) {
 					swapx = x - 1;
 					swapy = y;
@@ -237,8 +242,9 @@ int main(int argc, char *argv[]) {
 				else {
 					continue;
 				}
-		}
-		else if (c == KEY_RIGHT || c == 'l') {
+				break;
+			case KEY_RIGHT:
+			case 'l':
 				if (x != cols - 1) {
 					swapx = x + 1;
 					swapy = y;
@@ -246,8 +252,8 @@ int main(int argc, char *argv[]) {
 				else {
 					continue;
 				}
-		}
-		else {
+				break;
+			default:
 				continue;
 		}
 		swap(y, x, swapy, swapx, cols, cells, yCoords, xCoords);
