@@ -72,8 +72,24 @@ void getOffsets(const int lines, const int lastLength, const int lineCoords[], i
 }
 
 // draws number at position, properly centering it
-void drawNum(int y, int x, int num, bool onRight) {
+void drawNum(const int y, const int x, const int num, const bool onRight) {
 	mvprintw(y, x - (intLength(num) - onRight) / 2, "%i", num);
+}
+
+// clears out cell at coordinate yCoord, xCoord
+void clearSpot(const int yCoord, int xCoord, const int value, const bool onRight) {
+	const int length = intLength(value);
+	xCoord -= (length - onRight) / 2;
+	mvhline(yCoord, xCoord, ' ', length);
+}
+
+// executes f on every cell
+void cellsMap(const int rows, const int cols, const int yCells[], const int xCells[], const int data[][cols], void (*f)(int, int, int, bool)) {
+	for (int y = 0; y < rows; y++) {
+		for (int x = 0; x < cols; x++) {
+			f(yCells[y], xCells[x], data[y][x], x >= (cols + 1) / 2);
+		}
+	}
 }
 
 // draws the grid and draws initial set of numbers
@@ -143,22 +159,18 @@ void init(int rows, int cols, int data[][cols], int yCells[], int xCells[]) {
 	}
 }
 
-// clears out cell at coordinate y, x
-void clearSpot(int y, int x, int cols, int data[][cols], int yCellCoords[], int xCellCoords[]) {
-	const int length = intLength(data[y][x]);
-	int xCoord = xCellCoords[x] - (length - (x >= ((cols + 1) / 2))) / 2;
-	mvhline(yCellCoords[y], xCoord, ' ', length);
-}
-
 // swap and redraw two values at specified coords
 void swap(int y, int x, int swapy, int swapx, int cols, int data[][cols], int yCoords[], int xCoords[]) {
+	const bool xOnRight     = x     >= (cols + 1) / 2;
+	const bool swapXOnRight = swapx >= (cols + 1) / 2;
+
 	// clear out spaces on screen
-	clearSpot(y, x, cols, data, yCoords, xCoords);
-	clearSpot(swapy, swapx, cols, data, yCoords, xCoords);
+	clearSpot(yCoords[y], xCoords[x] + xOnRight, data[y][x], xOnRight);
+	clearSpot(yCoords[swapy], xCoords[swapx] + swapXOnRight, data[swapy][swapx], swapXOnRight);
 
 	// redraw
-	drawNum(yCoords[y], xCoords[x], data[swapy][swapx], x >= (cols + 1) / 2);
-	drawNum(yCoords[swapy], xCoords[swapx], data[y][x], swapx >= (cols + 1) / 2);
+	drawNum(yCoords[y], xCoords[x], data[swapy][swapx], swapXOnRight);
+	drawNum(yCoords[swapy], xCoords[swapx], data[y][x], xOnRight);
 
 	// swap values in memory
 	const int temp = data[y][x];
