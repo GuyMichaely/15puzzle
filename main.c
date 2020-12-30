@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include "griddrawing.h"
+#include "inversions.h"
 
 #define interactiveDebug(...) { \
 	mvprintw(0, 0, "                                                                                                                                                                            "); \
