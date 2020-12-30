@@ -20,15 +20,15 @@ int *firstGreaterIndex(int v, int start[], int end[]) {
 // end is index after last element
 // modifies the input array
 // returns false for even parity false otherwise
-bool mergeSortInversion(int start[], int end[]) {
+bool mergeSortInversions(int start[], int end[]) {
 	if (end - start == 1) {
 		return 0;
 	}
 	
 	bool inversions = false;
 	int *sep = start + (end - start) / 2; // seperation between the two list halves
-	inversions += mergeSortInversion(start, sep);
-	inversions ^= mergeSortInversion(sep, end);
+	inversions += mergeSortInversions(start, sep);
+	inversions ^= mergeSortInversions(sep, end);
 
 	while (end != sep && sep != start) {
 		if (start[0] > sep[0]) {
