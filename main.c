@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "griddrawing.h"
 #include "inversions.h"
@@ -18,20 +19,46 @@ do { \
 
 int main(int argc, char *argv[]) {
 	int cols, rows;
-	if (argc == 1) {
-		cols = rows = 2;
+	int needToSeed = true;
+	long int seed;
+
+	opterr = 0;
+	int c;
+	while ((c = getopt(argc, argv, "s:")) != -1) {
+		switch (c) {
+			case 's':
+				seed = atol(optarg);
+				needToSeed = false;
+				srand(seed);
+				break;
+			case ':':
+				fprintf(stderr, "Seed option must take value\n");
+				exit(1);
+			case '?':
+				fprintf(stderr, "Unknown option %c\n", optopt);
+				exit(2);
+		}
 	}
-	else if (argc != 3) {
-		printf("Usage: npuzzle [rows columns]\n");
-		return 1;
+
+	argc -= optind;
+	if (needToSeed) {
+		seed = time(0);
+		srand(seed);
 	}
-	else {	
-		rows = atoi(argv[1]);
-		cols = atoi(argv[2]);
+	if (argc == 0) {
+		cols = rows = 4;
 	}
-	if (rows < 2 || cols < 2) {
-		printf("Both rows and columns must be more than 1\n");
-		return 2;
+	else if (argc == 2) {
+		rows = atoi(argv[optind]);
+		cols = atoi(argv[optind + 1]);
+		if (rows < 2 || cols < 2) {
+			fprintf(stderr, "The game breaks when either dimension has a value less than 2\n");
+			exit(1);
+		}
+	}
+	else {
+		printf("Usage: ./npuzzle [columns rows] [-s seed]\nseed must be a long int\n");
+		exit(1);
 	}
 
 	// game init
@@ -40,7 +67,6 @@ int main(int argc, char *argv[]) {
 	int xCoords[cols];
 	init(rows, cols, cells, yCoords, xCoords);
 
-	int c;
 	int x, y;
 	x = y = 0;
 
@@ -48,7 +74,9 @@ int main(int argc, char *argv[]) {
 	while ((c = getch()) != 'q' && c != 'Q') {
 		int swapx, swapy;
 		
+		int count = 0;
 		switch (c) {
+		//	clearPrint(0, 0, "%i", count++);
 			// randomize board
 			case 'r':
 			// add blocks so variable decleration works as you would want
@@ -66,7 +94,6 @@ int main(int argc, char *argv[]) {
 				}
 
 				// randomize board
-				srand(time(0));
 				const int length = rows * cols;
 				int i = 0;
 				for (; i < length; i++) {
@@ -103,9 +130,10 @@ int main(int argc, char *argv[]) {
 				// board is not solvable if odd parity
 				// if so, swap 2 arbitrary non 0 cells
 				if (parity) {
-					const int temp = cells[(y + 1) % rows][x];
+					cells[y][x] = cells[(y + 1) % rows][x]; // use 0 cell as temp
 					cells[(y + 1) % rows][x] = cells[(y + 1) % rows][(x + 1) % cols];
-					cells[(y + 1) % rows][(x + 1) % cols] = temp;
+					cells[(y + 1) % rows][(x + 1) % cols] = cells[y][x];
+					cells[y][x] = 0;
 				}
 				
 				cellsMap(rows, cols, yCoords, xCoords, cells, drawNum); // redraw all numbers
