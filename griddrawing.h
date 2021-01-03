@@ -1,3 +1,5 @@
+#include <ncurses.h>
+
 // d is the length of the dimension
 // margin length and grid length will be stored in *margin, *length
 int getMargin(int d){
@@ -84,12 +86,57 @@ void clearSpot(const int yCoord, int xCoord, const int value, const bool onRight
 }
 
 // executes f on every cell
-void cellsMap(const int rows, const int cols, const int yCells[], const int xCells[], const int data[][cols], void (*f)(int, int, int, bool)) {
-	for (int y = 0; y < rows; y++) {
-		for (int x = 0; x < cols; x++) {
-			f(yCells[y], xCells[x], data[y][x], x >= (cols + 1) / 2);
+// skips (y0, x0) and executes f on that cell last
+void cellsMap(const int y0, const int x0, const int rows, const int cols, const int yCells[], const int xCells[], const int data[][cols], void (*f)(int, int, int, bool)) {
+	// iterate up to y0 row
+	for (int y = 0; y < y0; y++) {
+		for (int x = 0; x < (cols + 1) / 2; x++) {
+			f(yCells[y], xCells[x], data[y][x], false);
+		}
+		for (int x = (cols + 1) / 2; x < cols; x++) {
+			f(yCells[y], xCells[x], data[y][x], true);
 		}
 	}
+
+	// iterate up to either halfway or x0
+	int x = 0;
+	for (; x < x0 && x < (cols + 1) / 2; x++) {
+		f(yCells[y0], xCells[x], data[y0][x], false);
+	}
+
+	// if stopped because reached x0, iterate until halfway
+	// else if stopped because reached halfway, continue until reach x0
+	// then continue
+	if (x == x0) {
+		x++;
+		for (; x < (cols + 1) / 2; x++) {
+			f(yCells[y0], xCells[x], data[y0][x], false);
+		}
+	}
+	else {
+		for (; x < x0; x++) {
+			f(yCells[y0], xCells[x], data[y0][x], true);
+		}
+		x++;
+	}
+	for (; x < cols; x++) {
+		f(yCells[y0], xCells[x], data[y0][x], true);
+	}
+
+	// iterate through the rest
+	for (int y = y0 + 1; y < rows; y++) {
+		for (int x = 0; x < (cols + 1) / 2; x++) {
+			f(yCells[y], xCells[x], data[y][x], false);
+		}
+		for (int x = (cols + 1) / 2; x < cols; x++) {
+			f(yCells[y], xCells[x], data[y][x], true);
+		}
+	}
+
+	// finally deal with (y0, x0)
+	attron(A_BOLD);
+	f(yCells[y0], xCells[x0], (char)data[y0][x0], x0 >= (cols + 1) / 2);
+	attroff(A_BOLD);
 }
 
 // draws the grid and draws initial set of numbers
@@ -99,9 +146,7 @@ void init(int rows, int cols, int data[][cols], int yCells[], int xCells[]) {
 	initscr();
 	noecho();
 	raw();
-	keypad(stdscr, TRUE);
-	
-
+	keypad(stdscr, TRUE);	
 	for (int y = 0; y < rows; y++) {
 		for (int x = 0; x < cols; x++) {
 			data[y][x] = y * rows + x;
@@ -146,17 +191,7 @@ void init(int rows, int cols, int data[][cols], int yCells[], int xCells[]) {
 		}
 	}
 
-	// draw numbers in cells
-	for (int y = 0; y < rows; y++) {
-		for (int x = 0; x < (cols + 1) / 2; x++) {
-			const int v = data[y][x];
-			mvprintw(yCells[y], xCells[x] - intLength(v) / 2, "%i", v); 
-		}
-		for (int x = (cols + 1) / 2; x < cols; x++) {
-			const int v = data[y][x];
-			mvprintw(yCells[y], xCells[x] - (intLength(v) - 1) / 2, "%i", v);
-		}
-	}
+	cellsMap(0, 0, rows, cols, yCells, xCells, data, drawNum);
 }
 
 // swap and redraw two values at specified coords
@@ -165,16 +200,17 @@ void swap(int y, int x, int swapy, int swapx, int cols, int data[][cols], int yC
 	const bool swapXOnRight = swapx >= (cols + 1) / 2;
 
 	// clear out spaces on screen
-	clearSpot(yCoords[y], xCoords[x] + xOnRight, data[y][x], xOnRight);
-	clearSpot(yCoords[swapy], xCoords[swapx] + swapXOnRight, data[swapy][swapx], swapXOnRight);
+	clearSpot(yCoords[y], xCoords[x], data[y][x], xOnRight);
+	clearSpot(yCoords[swapy], xCoords[swapx], data[swapy][swapx], swapXOnRight);
 
 	// redraw
-	drawNum(yCoords[y], xCoords[x], data[swapy][swapx], swapXOnRight);
-	drawNum(yCoords[swapy], xCoords[swapx], data[y][x], xOnRight);
+	drawNum(yCoords[y], xCoords[x], data[swapy][swapx], xOnRight);
+	attron(A_BOLD);
+	drawNum(yCoords[swapy], xCoords[swapx], data[y][x], swapXOnRight);
+	attroff(A_BOLD);
 
 	// swap values in memory
 	const int temp = data[y][x];
 	data[y][x] = data[swapy][swapx];
 	data[swapy][swapx] = temp;
 }
-

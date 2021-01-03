@@ -74,17 +74,18 @@ int main(int argc, char *argv[]) {
 	while ((c = getch()) != 'q' && c != 'Q') {
 		int swapx, swapy;
 		
-		int count = 0;
 		switch (c) {
-		//	clearPrint(0, 0, "%i", count++);
+			case 's':
+				mvprintw(0, 0, "%li", seed);
+				continue;
 			// randomize board
 			case 'r':
 			// add blocks so variable decleration works as you would want
 			// i don't really know how it works ive just had bad experiences with switch in the past
 			{
 				// clear board
-				cellsMap(rows, cols, yCoords, xCoords, cells, clearSpot);
-
+				cellsMap(y, x, rows, cols, yCoords, xCoords, cells, clearSpot);
+				
 				// create array of numbers to be put in grid
 				int nums[rows * cols];
 				for (int y = 0; y < rows; y++) {
@@ -135,9 +136,12 @@ int main(int argc, char *argv[]) {
 					cells[(y + 1) % rows][(x + 1) % cols] = cells[y][x];
 					cells[y][x] = 0;
 				}
-				
-				cellsMap(rows, cols, yCoords, xCoords, cells, drawNum); // redraw all numbers
+
+				cellsMap(y, x, rows, cols, yCoords, xCoords, cells, drawNum); // redraw all numbers
 			}
+				continue;
+			// ai solve
+			case 'a':
 				continue;
 			// movement controls
 			case KEY_UP:
