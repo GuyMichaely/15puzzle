@@ -1,5 +1,6 @@
 #include <stdbool.h>
-
+#include <string.h>
+#include "test.h"
 // return index of smallest number bigger than v
 // or returns end if v larger than all
 // end is index after last element
@@ -16,46 +17,27 @@ int *firstGreaterIndex(int v, int start[], int end[]) {
 	return start;
 }
 
-// count inversions in array while performing merge sort
-// end is index after last element
-// modifies the input array
-// returns false for even parity false otherwise
-bool mergeSortInversions(int start[], int end[]) {
-	if (end - start == 1) {
-		return 0;
-	}
-	
-	bool inversions = false;
-	int *sep = start + (end - start) / 2; // seperation between the two list halves
-	inversions += mergeSortInversions(start, sep);
-	inversions ^= mergeSortInversions(sep, end);
+// credit for this algorithm goes to Chris Calabro
+// http://cseweb.ucsd.edu/~ccalabro/essays/15_puzzle.pdf
+// gives sign of inversion in O(length) iterations
+bool inversionParity(int arr[], int length) {
+        int copy[length];
+	// getchPrintArr(0, 0, arr, length);
+        memcpy(copy, arr, length * sizeof(int));
+        bool s = false;
+        int i = 0;
+        while (i < length) {
+                if (i != copy[i]) {
+			// swap copy[i] and copy[copy[i]]
+                        const int temp = copy[i];
+                        copy[i] = copy[temp];
+                        copy[temp] = temp;
 
-	while (end != sep && sep != start) {
-		if (start[0] > sep[0]) {
-			// number of elements in second list less than first element of first list
-			int numSmaller = firstGreaterIndex(start[0], sep, end) - sep;
-			inversions ^= (numSmaller * (sep - start)) % 2;
-			
-			// save the numbers we're about to overwrite
-			int temps[numSmaller];
-			for (int i = 0; i < numSmaller; i++) {
-				temps[i] = sep[i];
-			}
-			
-			// shift the numbers in the first list by numSmaller
-			for (int *i = sep - 1; i >= start; i--) {
-				i[numSmaller] = *i;
-			}
-			sep += numSmaller;
-
-			// put the smaller numbers at the beginning
-			for (int i = 0; i < numSmaller; i++) {
-				start[i] = temps[i];
-			}
-			start += numSmaller;
-		}
-		start++;
-	}
-	
-	return inversions;
+                        s = !s; 
+                }   
+                else {
+                        i++;
+                }   
+        }
+        return s;
 }

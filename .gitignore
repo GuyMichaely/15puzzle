@@ -1,4 +1,6 @@
 *.swp
+*.swn
+*.swo
 main
 test*
 !test.h

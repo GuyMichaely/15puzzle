@@ -1,4 +1,5 @@
 #include <ncurses.h>
+#include "test.h"
 
 // d is the length of the dimension
 // margin length and grid length will be stored in *margin, *length
@@ -149,7 +150,7 @@ void init(int rows, int cols, int data[][cols], int yCells[], int xCells[]) {
 	keypad(stdscr, TRUE);	
 	for (int y = 0; y < rows; y++) {
 		for (int x = 0; x < cols; x++) {
-			data[y][x] = y * rows + x;
+			data[y][x] = y * cols + x;
 		}
 	}
 
