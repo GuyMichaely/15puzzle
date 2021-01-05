@@ -136,7 +136,7 @@ void cellsMap(const int y0, const int x0, const int rows, const int cols, const 
 
 	// finally deal with (y0, x0)
 	attron(A_BOLD);
-	f(yCells[y0], xCells[x0], (char)data[y0][x0], x0 >= (cols + 1) / 2);
+	f(yCells[y0], xCells[x0], 0, x0 >= (cols + 1) / 2);
 	attroff(A_BOLD);
 }
 
@@ -148,7 +148,12 @@ void init(int rows, int cols, int data[][cols], int yCells[], int xCells[]) {
 	noecho();
 	raw();
 	keypad(stdscr, TRUE);	
-	for (int y = 0; y < rows; y++) {
+
+	// skip (0, 0) because that will be drawn by coordinate
+	for (int x = 1; x < cols; x++) {
+		data[0][x] = x;
+	}
+	for (int y = 1; y < rows; y++) {
 		for (int x = 0; x < cols; x++) {
 			data[y][x] = y * cols + x;
 		}
@@ -193,25 +198,4 @@ void init(int rows, int cols, int data[][cols], int yCells[], int xCells[]) {
 	}
 
 	cellsMap(0, 0, rows, cols, yCells, xCells, data, drawNum);
-}
-
-// swap and redraw two values at specified coords
-void swap(int y, int x, int swapy, int swapx, int cols, int data[][cols], int yCoords[], int xCoords[]) {
-	const bool xOnRight     = x     >= (cols + 1) / 2;
-	const bool swapXOnRight = swapx >= (cols + 1) / 2;
-
-	// clear out spaces on screen
-	clearSpot(yCoords[y], xCoords[x], data[y][x], xOnRight);
-	clearSpot(yCoords[swapy], xCoords[swapx], data[swapy][swapx], swapXOnRight);
-
-	// redraw
-	drawNum(yCoords[y], xCoords[x], data[swapy][swapx], xOnRight);
-	attron(A_BOLD);
-	drawNum(yCoords[swapy], xCoords[swapx], data[y][x], swapXOnRight);
-	attroff(A_BOLD);
-
-	// swap values in memory
-	const int temp = data[y][x];
-	data[y][x] = data[swapy][swapx];
-	data[swapy][swapx] = temp;
 }

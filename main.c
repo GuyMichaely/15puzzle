@@ -110,15 +110,8 @@ int main(int argc, char *argv[]) {
 					// already found the 0 so no need to check for it
 					fillRand(cells, nums, i / cols, i % cols, length - i);
 				}
-				mvhline(0, 0, ' ', 90);
-				mvhline(1, 0, ' ', 90);
 
 				// make sure the board is actually solvable
-				// a board is solvable (able to get back to the original state)
-				// iff the parity of the grid permutation's inversion number
-				// + the manhattan distance of the 0 cell to the top left is even.
-				// if our randomization isn't, will swap 2 cells to make it so
-
 				bool parity = inversionParity((int*)cells, length);
 				parity ^= (x + y) % 2; // parity of manhattan distance of movable cell
 				
@@ -128,7 +121,6 @@ int main(int argc, char *argv[]) {
 					cells[y][x] = cells[(y + 1) % rows][x]; // use 0 cell as temp
 					cells[(y + 1) % rows][x] = cells[(y + 1) % rows][(x + 1) % cols];
 					cells[(y + 1) % rows][(x + 1) % cols] = cells[y][x];
-					cells[y][x] = 0;
 				}
 
 				cellsMap(y, x, rows, cols, yCoords, xCoords, cells, drawNum); // redraw all numbers
@@ -181,7 +173,19 @@ int main(int argc, char *argv[]) {
 			default:
 				continue;
 		}
-		swap(y, x, swapy, swapx, cols, cells, yCoords, xCoords);
+		// make the swap
+		// 
+		const bool xOnRight     =     x >= (cols + 1) / 2;
+		const bool swapXOnRight = swapx >= (cols + 1) / 2;
+
+		clearSpot(yCoords[y], xCoords[x], 0, xOnRight);
+		drawNum(yCoords[y], xCoords[x], cells[swapy][swapx], xOnRight);
+
+		clearSpot(yCoords[swapy], xCoords[swapx], cells[swapy][swapx], swapXOnRight);
+		attron(A_BOLD);
+		drawNum(yCoords[swapy], xCoords[swapx], 0, swapXOnRight);
+		attroff(A_BOLD);
+		cells[y][x] = cells[swapy][swapx];
 		x = swapx;
 		y = swapy;
 		refresh();
