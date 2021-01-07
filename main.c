@@ -4,22 +4,15 @@
 #include <stdbool.h>
 #include <time.h>
 #include <unistd.h>
+#include <string.h>
 
-#include "griddrawing.h"
-#include "inversions.h"
-#include "test.h"
-
-// fills in next spot in cells with random available number in nums
-#define fillRand(cells, nums, y, x, listSize) \
-do { \
-	int choice = rand() % (listSize); \
-	cells[(y)][(x)] = nums[choice]; \
-	nums[choice] = nums[(listSize) - 1]; \
-} while (false)
+#include "drawing.h"
+#include "randomization.h"
+/* #include "test.h" */
 
 int main(int argc, char *argv[]) {
 	int cols, rows;
-	int needToSeed = true;
+	bool needToSeed = true;
 	long int seed;
 
 	opterr = 0;
@@ -40,11 +33,11 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	argc -= optind;
 	if (needToSeed) {
 		seed = time(0);
 		srand(seed);
 	}
+	argc -= optind;
 	if (argc == 0) {
 		cols = rows = 4;
 	}
@@ -53,14 +46,14 @@ int main(int argc, char *argv[]) {
 		cols = atoi(argv[optind + 1]);
 		if (rows < 2 || cols < 2) {
 			fprintf(stderr, "The game breaks when either dimension has a value less than 2\n");
-			exit(1);
+			exit(3);
 		}
 	}
 	else {
 		printf("Usage: ./npuzzle [columns rows] [-s seed]\nseed must be a long int\n");
-		exit(1);
+		exit(4);
 	}
-
+	
 	// game init
 	int cells[rows][cols];
 	int yCoords[rows];
@@ -80,55 +73,13 @@ int main(int argc, char *argv[]) {
 				continue;
 			// randomize board
 			case 'r':
-			// add blocks so variable decleration works as you would want
-			// i don't really know how it works ive just had bad experiences with switch in the past
-			{
-				// clear board
-				cellsMap(y, x, rows, cols, yCoords, xCoords, cells, clearSpot);
-				// create array of numbers to be put in grid
-				int nums[rows * cols];
-				for (int y = 0; y < rows; y++) {
-					for (int x = 0; x < cols; x++) {
-						nums[y * cols + x] = y * cols + x;
-					}
-				}
-				// randomize board
-				const int length = rows * cols;
-
-				int i = 0;
-				for (; i < length; i++) {
-					y = i / cols;
-					x = i % cols;
-					fillRand(cells, nums, y, x, length - i);
-					// need to keep track of the 0 to set its coords
-					if (cells[y][x] == 0) {
-						i++;
-						break;
-					}
-				}
-				for (; i < length; i++) {
-					// already found the 0 so no need to check for it
-					fillRand(cells, nums, i / cols, i % cols, length - i);
-				}
-
-				// make sure the board is actually solvable
-				bool parity = inversionParity((int*)cells, length);
-				parity ^= (x + y) % 2; // parity of manhattan distance of movable cell
-				
-				// board is not solvable if odd parity
-				// if so, swap 2 arbitrary non 0 cells
-				if (parity) {
-					cells[y][x] = cells[(y + 1) % rows][x]; // use 0 cell as temp
-					cells[(y + 1) % rows][x] = cells[(y + 1) % rows][(x + 1) % cols];
-					cells[(y + 1) % rows][(x + 1) % cols] = cells[y][x];
-				}
-
-				cellsMap(y, x, rows, cols, yCoords, xCoords, cells, drawNum); // redraw all numbers
-			}
+				randomize(&y, &x, rows, cols, yCoords, xCoords, cells);
 				continue;
 			// ai solve
 			case 'a':
+			{
 				continue;
+			}
 			// movement controls
 			case KEY_UP:
 			case 'k':
@@ -173,22 +124,7 @@ int main(int argc, char *argv[]) {
 			default:
 				continue;
 		}
-		// make the swap
-		// 
-		const bool xOnRight     =     x >= (cols + 1) / 2;
-		const bool swapXOnRight = swapx >= (cols + 1) / 2;
-
-		clearSpot(yCoords[y], xCoords[x], 0, xOnRight);
-		drawNum(yCoords[y], xCoords[x], cells[swapy][swapx], xOnRight);
-
-		clearSpot(yCoords[swapy], xCoords[swapx], cells[swapy][swapx], swapXOnRight);
-		attron(A_BOLD);
-		drawNum(yCoords[swapy], xCoords[swapx], 0, swapXOnRight);
-		attroff(A_BOLD);
-		cells[y][x] = cells[swapy][swapx];
-		x = swapx;
-		y = swapy;
-		refresh();
+		swap0(&y, &x, swapy, swapx, cols, cells, xCoords, yCoords);
 	}
 	endwin();
 }

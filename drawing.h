@@ -1,5 +1,7 @@
+#pragma once
+
 #include <ncurses.h>
-#include "test.h"
+// #include "test.h"
 
 // d is the length of the dimension
 // margin length and grid length will be stored in *margin, *length
@@ -86,23 +88,41 @@ void clearSpot(const int yCoord, int xCoord, const int value, const bool onRight
 	mvhline(yCoord, xCoord, ' ', length);
 }
 
+// swap 0 cell with (swapy, swapx)
+void swap0(int *y, int *x, const int swapy, const int swapx, const int cols, int cells[][cols], int xCoords[], int yCoords[]) {
+	const bool xOnRight     =    *x >= (cols + 1) / 2;
+	const bool swapXOnRight = swapx >= (cols + 1) / 2;
+
+	clearSpot(yCoords[*y], xCoords[*x], 0, xOnRight);
+	drawNum(yCoords[*y], xCoords[*x], cells[swapy][swapx], xOnRight);
+
+	clearSpot(yCoords[swapy], xCoords[swapx], cells[swapy][swapx], swapXOnRight);
+	attron(A_BOLD);
+	drawNum(yCoords[swapy], xCoords[swapx], 0, swapXOnRight);
+	attroff(A_BOLD);
+	cells[*y][*x] = cells[swapy][swapx];
+	*x = swapx;
+	*y = swapy;
+	refresh();
+}
+
 // executes f on every cell
 // skips (y0, x0) and executes f on that cell last
-void cellsMap(const int y0, const int x0, const int rows, const int cols, const int yCells[], const int xCells[], const int data[][cols], void (*f)(int, int, int, bool)) {
+void cellsMap(const int y0, const int x0, const int rows, const int cols, const int yCells[], const int xCells[], const int cells[][cols], void (*f)(int, int, int, bool)) {
 	// iterate up to y0 row
 	for (int y = 0; y < y0; y++) {
 		for (int x = 0; x < (cols + 1) / 2; x++) {
-			f(yCells[y], xCells[x], data[y][x], false);
+			f(yCells[y], xCells[x], cells[y][x], false);
 		}
 		for (int x = (cols + 1) / 2; x < cols; x++) {
-			f(yCells[y], xCells[x], data[y][x], true);
+			f(yCells[y], xCells[x], cells[y][x], true);
 		}
 	}
 
 	// iterate up to either halfway or x0
 	int x = 0;
 	for (; x < x0 && x < (cols + 1) / 2; x++) {
-		f(yCells[y0], xCells[x], data[y0][x], false);
+		f(yCells[y0], xCells[x], cells[y0][x], false);
 	}
 
 	// if stopped because reached x0, iterate until halfway
@@ -111,26 +131,26 @@ void cellsMap(const int y0, const int x0, const int rows, const int cols, const 
 	if (x == x0) {
 		x++;
 		for (; x < (cols + 1) / 2; x++) {
-			f(yCells[y0], xCells[x], data[y0][x], false);
+			f(yCells[y0], xCells[x], cells[y0][x], false);
 		}
 	}
 	else {
 		for (; x < x0; x++) {
-			f(yCells[y0], xCells[x], data[y0][x], true);
+			f(yCells[y0], xCells[x], cells[y0][x], true);
 		}
 		x++;
 	}
 	for (; x < cols; x++) {
-		f(yCells[y0], xCells[x], data[y0][x], true);
+		f(yCells[y0], xCells[x], cells[y0][x], true);
 	}
 
 	// iterate through the rest
 	for (int y = y0 + 1; y < rows; y++) {
 		for (int x = 0; x < (cols + 1) / 2; x++) {
-			f(yCells[y], xCells[x], data[y][x], false);
+			f(yCells[y], xCells[x], cells[y][x], false);
 		}
 		for (int x = (cols + 1) / 2; x < cols; x++) {
-			f(yCells[y], xCells[x], data[y][x], true);
+			f(yCells[y], xCells[x], cells[y][x], true);
 		}
 	}
 
@@ -142,7 +162,7 @@ void cellsMap(const int y0, const int x0, const int rows, const int cols, const 
 
 // draws the grid and draws initial set of numbers
 // stores cell coordinates in yCells and xCells
-void init(int rows, int cols, int data[][cols], int yCells[], int xCells[]) {
+void init(int rows, int cols, int cells[][cols], int yCells[], int xCells[]) {
 	// ncurses initialization 
 	initscr();
 	noecho();
@@ -151,11 +171,11 @@ void init(int rows, int cols, int data[][cols], int yCells[], int xCells[]) {
 
 	// skip (0, 0) because that will be drawn by coordinate
 	for (int x = 1; x < cols; x++) {
-		data[0][x] = x;
+		cells[0][x] = x;
 	}
 	for (int y = 1; y < rows; y++) {
 		for (int x = 0; x < cols; x++) {
-			data[y][x] = y * cols + x;
+			cells[y][x] = y * cols + x;
 		}
 	}
 
@@ -197,5 +217,5 @@ void init(int rows, int cols, int data[][cols], int yCells[], int xCells[]) {
 		}
 	}
 
-	cellsMap(0, 0, rows, cols, yCells, xCells, data, drawNum);
+	cellsMap(0, 0, rows, cols, yCells, xCells, cells, drawNum);
 }
