@@ -3,6 +3,10 @@
 #include <ncurses.h>
 // #include "test.h"
 
+inline static void midPrint(int row, char *string) {
+	mvprintw(row, (COLS - strlen((string))) / 2, string);
+}
+
 // d is the length of the dimension
 // margin length and grid length will be stored in *margin, *length
 int getMargin(int d){

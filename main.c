@@ -8,6 +8,7 @@
 
 #include "drawing.h"
 #include "randomization.h"
+#include "ai.h"
 /* #include "test.h" */
 
 int main(int argc, char *argv[]) {
@@ -78,6 +79,7 @@ int main(int argc, char *argv[]) {
 			// ai solve
 			case 'a':
 			{
+				ai(cols, rows, &y, &x, cells, xCoords, yCoords);
 				continue;
 			}
 			// movement controls
