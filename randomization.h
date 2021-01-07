@@ -2,12 +2,15 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "undo.h"
 #include "drawing.h"
 // #include "test.h"
 
+#include "globals.h"
+
 // randomizes ith element of cells with element of nums
 // returns whether or not chosen num is 0
-bool fillRand(const int cols, int cells[][cols], int nums[], const int i, const int length) {
+bool fillRand(int nums[], const int i, const int length) {
 	const int choice = rand() % (length - i);
 	cells[i / cols][i % cols] = nums[choice];
 	nums[choice] = nums[length - i - 1];
@@ -15,9 +18,9 @@ bool fillRand(const int cols, int cells[][cols], int nums[], const int i, const 
 }
 
 // randomize board
-void randomize(int *y, int *x, int rows, int cols, int yCoords[], int xCoords[], int cells[][cols]) {
+void randomize() {
 	// clear board
-	cellsMap(*y, *x, rows, cols, yCoords, xCoords, cells, clearSpot);
+	cellsMap(clearSpot); 
 
 	// will randomize by:
 	// 1. creating array of ints from 0 to length - 1
@@ -40,14 +43,9 @@ void randomize(int *y, int *x, int rows, int cols, int yCoords[], int xCoords[],
 	int i = 0;
 	for (; i < length; i++) {
 		// need to keep track of the 0 to set its coords
-		// fillRand(cells, nums, i / cols, i % cols, length - i);
-		// const int choice = rand() % (length - i);
-		// cells[i / cols][i % cols] = nums[choice];
-		// nums[choice] = nums[length - i - 1];
-
-		if (fillRand(cols, cells, nums, i, length)) {
-			*y = i / cols;
-			*x = i % cols;
+		if (fillRand(nums, i, length)) {
+			yCoord = i / cols;
+			xCoord = i % cols;
 			i++;
 			break;
 		}
@@ -58,7 +56,7 @@ void randomize(int *y, int *x, int rows, int cols, int yCoords[], int xCoords[],
 		// const int choice = rand() % (length - i);
 		// cells[i / cols][i % cols] = nums[choice];
 		// nums[choice] = nums[length - i - 1];
-		fillRand(cols, cells, nums, i, length);
+		fillRand(nums, i, length);
 	}
 
 	// make sure the board is actually solvable
@@ -66,8 +64,15 @@ void randomize(int *y, int *x, int rows, int cols, int yCoords[], int xCoords[],
 	// credit for this algorithm goes to Chris Calabro
 	// http://cseweb.ucsd.edu/~ccalabro/essays/15_puzzle.pdf
 	// gives sign of inversion in O(length) iterations
+	//
+	// copy cells to an array its ok to modify
 	int copy[length];
-	memcpy(copy, cells, length * sizeof(int));
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			copy[i * cols + j] = cells[i][j];
+		}
+	}
+
 	bool parity = false;
 	i = 0;
 	while (i < length) {
@@ -83,15 +88,15 @@ void randomize(int *y, int *x, int rows, int cols, int yCoords[], int xCoords[],
 			i++;
 		}   
 	}
-	parity = parity != ((*x + *y) % 2); // xor parity with the parity of manhattan distance of 0 to its goal position
+	parity = parity != ((xCoord + yCoord) % 2); // xor parity with the parity of manhattan distance of 0 to its goal position
 
 	// board is not solvable if odd parity
 	// if so, swap 2 arbitrary non 0 cells
 	if (parity) {
-		cells[*y][*x] = cells[(*y + 1) % rows][*x]; // use 0 cell as temp
-		cells[(*y + 1) % rows][*x] = cells[(*y + 1) % rows][(*x + 1) % cols];
-		cells[(*y + 1) % rows][(*x + 1) % cols] = cells[*y][*x];
+		cells[yCoord][xCoord] = cells[(yCoord + 1) % rows][xCoord]; // use 0 cell as temp
+		cells[(yCoord + 1) % rows][xCoord] = cells[(yCoord + 1) % rows][(xCoord + 1) % cols];
+		cells[(yCoord + 1) % rows][(xCoord + 1) % cols] = cells[yCoord][xCoord];
 	}
 
-	cellsMap(*y, *x, rows, cols, yCoords, xCoords, cells, drawNum); // redraw all numbers
+	cellsMap(drawNum); // redraw all numbers
 }

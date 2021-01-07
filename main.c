@@ -9,13 +9,41 @@
 #include "drawing.h"
 #include "randomization.h"
 #include "ai.h"
+#include "undo.h"
 /* #include "test.h" */
 
+int cols, rows, yCoord, xCoord;
+int *yCoords, *xCoords;
+int **cells;
+
+// undo the move represented by **move
+void undoMove(Move **move) {
+	if (*move != NULL) {
+		switch ((*move)->move) {
+			case 'u':
+				swap0NoUndo(yCoord - 1, xCoord);
+				break;
+			case 'l':
+				swap0NoUndo(yCoord, xCoord - 1);
+				break;
+			case 'd':
+				swap0NoUndo(yCoord + 1, xCoord);
+				break;
+			case 'r':
+				swap0NoUndo(yCoord, xCoord + 1);
+				break;
+		}
+		const Move *toFree = *move;
+		*move = (*move)->prev;
+		free(toFree);
+	}
+}
+
 int main(int argc, char *argv[]) {
-	int cols, rows;
 	bool needToSeed = true;
 	long int seed;
 
+	// cmd line parsing
 	opterr = 0;
 	int c;
 	while ((c = getopt(argc, argv, "s:")) != -1) {
@@ -56,13 +84,17 @@ int main(int argc, char *argv[]) {
 	}
 	
 	// game init
-	int cells[rows][cols];
-	int yCoords[rows];
-	int xCoords[cols];
-	init(rows, cols, cells, yCoords, xCoords);
+	cells = malloc(rows * sizeof(int *));
+	for (int i = 0; i < rows; i++) {
+		cells[i] = malloc(cols * sizeof(int));
+	}
+	yCoords = malloc(rows * sizeof(int));
+	xCoords = malloc(cols * sizeof(int));
+	init();
 
-	int x, y;
-	x = y = 0;
+	xCoord = yCoord = 0;
+
+	Move* undo = NULL;
 
 	// game loop
 	while ((c = getch()) != 'q' && c != 'Q') {
@@ -72,61 +104,51 @@ int main(int argc, char *argv[]) {
 			case 's':
 				mvprintw(0, 0, "%li", seed);
 				continue;
+			// undo move
+			case 'u':
+				undoMove(&undo);
+				continue;
 			// randomize board
 			case 'r':
-				randomize(&y, &x, rows, cols, yCoords, xCoords, cells);
+				randomize();
+			case 'c':
+				freeMoves(undo);
+				undo = NULL;
 				continue;
 			// ai solve
 			case 'a':
 			{
-				ai(cols, rows, &y, &x, cells, xCoords, yCoords);
+				ai(&undo);
 				continue;
 			}
 			// movement controls
 			case KEY_UP:
 			case 'k':
-				if (y != 0) {
-					swapy = y - 1;
-					swapx = x;
+				if (yCoord != 0) {
+					swap0(yCoord - 1, xCoord, &undo, 'd');
 				}
-				else {
-					continue;
-				}
-				break;
+				continue;
 			case KEY_DOWN:
 			case 'j':
-				if (y != rows - 1) {
-					swapy = y + 1;
-					swapx = x;
+				if (yCoord != rows - 1) {
+					swap0(yCoord + 1, xCoord, &undo, 'u');
 				}
-				else {
-					continue;
-				}
-				break;
+				continue;
 			case KEY_LEFT:
 			case 'h':
-				if (x != 0) {
-					swapx = x - 1;
-					swapy = y;
+				if (xCoord != 0) {
+					swap0(yCoord, xCoord - 1, &undo, 'r');
 				}
-				else {
-					continue;
-				}
-				break;
+				continue;
 			case KEY_RIGHT:
 			case 'l':
-				if (x != cols - 1) {
-					swapx = x + 1;
-					swapy = y;
+				if (xCoord != cols - 1) {
+					swap0(yCoord, xCoord + 1, &undo, 'l');
 				}
-				else {
-					continue;
-				}
-				break;
-			default:
 				continue;
 		}
-		swap0(&y, &x, swapy, swapx, cols, cells, xCoords, yCoords);
 	}
+
+	freeMoves(undo);
 	endwin();
 }
