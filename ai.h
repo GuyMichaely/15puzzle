@@ -3,6 +3,10 @@
 
 #include "drawing.h"
 
+#include "undo.h"
+#include "globals.h"
+
+#define MOVE_DELAY 250000
 static inline void clearMsg(const int y, char *msg) {
 	mvhline(y, (COLS - strlen(msg)) / 2, ' ', strlen(msg));
 }
@@ -15,28 +19,31 @@ static inline void clearMsgs() {
 	clearMsg(3, "2: https://www.aaai.org/Papers/JAIR/Vol22/JAIR-2209.pdf");
 
 }
-void funAi(const int cols, const int rows, int *y0, int *x0, int cells[][cols], int xCoords[], int yCoords[]) {
-	// bring 0 to (0, 0)
-	swap0(y0, x0, *y0, *x0 - 1, cols, cells, xCoords, yCoords);
-	while (*x0) {
-		usleep(400000);
-		const int c = getch();
-		if (c == 'q' || c == 'Q') {
-			return;
-		}
-		swap0(y0, x0, *y0, *x0 - 1, cols, cells, xCoords, yCoords);
+
+// sleeps and returns getch() == 'q' or 'Q'
+bool sleepGetch() {
+	usleep(MOVE_DELAY);
+	const int c = getch();
+	if (c == 'q' || c == 'Q') {
+		nodelay(stdscr, false);
+		return true;
 	}
-	while (*y0) {
-		usleep(400000);
-		const int c = getch();
-		if (c == 'q' || c == 'Q') {
-			return;
-		}
-		swap0(y0, x0, *y0 - 1, *x0, cols, cells, xCoords, yCoords);
-	}
+	return false;
 }
 
-void ai(const int cols, const int rows, int *y0, int *x0, int cells[][cols], int xCoords[], int yCoords[]) {
+// void move(int srcy, int srcx, const int desty, const int destx) {
+//         if (){}
+// }
+
+void funAiVert(Move **undo, const int lessY, const int lessX) {
+	for(;;){} 
+}
+
+void funAi(Move **undo) {
+	
+}
+
+void ai(Move **undo) {
 	midPrint(0, "What algorithm should be used to solve?");
 	midPrint(1, "0: Just for fun inefficient algorithm");
 	midPrint(2, "1: A* with linear conflict + manhattan distance as heuristic");
@@ -51,7 +58,7 @@ void ai(const int cols, const int rows, int *y0, int *x0, int cells[][cols], int
 				exit(0);
 			case '0':
 				clearMsgs();
-				funAi(cols, rows, y0, x0, cells, xCoords, yCoords);
+				funAi(undo);
 				return;
 		}
 	}
