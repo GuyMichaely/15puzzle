@@ -2,9 +2,8 @@
 #include <unistd.h>
 
 #include "drawing.h"
-
 #include "undo.h"
-#include "globals.h"
+#include "game_vars.h"
 
 #define MOVE_DELAY 250000
 static inline void clearMsg(const int y, char *msg) {
@@ -35,15 +34,15 @@ bool sleepGetch() {
 //         if (){}
 // }
 
-void funAiVert(Move **undo, const int lessY, const int lessX) {
+void funAiVert(GameVars *game, Move **undo, const int lessY, const int lessX) {
 	for(;;){} 
 }
 
-void funAi(Move **undo) {
+void funAi(GameVars *game, Move **undo) {
 	
 }
 
-void ai(Move **undo) {
+void ai(GameVars *game, Move **undo) {
 	midPrint(0, "What algorithm should be used to solve?");
 	midPrint(1, "0: Just for fun inefficient algorithm");
 	midPrint(2, "1: A* with linear conflict + manhattan distance as heuristic");
@@ -58,7 +57,7 @@ void ai(Move **undo) {
 				exit(0);
 			case '0':
 				clearMsgs();
-				funAi(undo);
+				funAi(game, undo);
 				return;
 		}
 	}
