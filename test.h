@@ -1,5 +1,5 @@
-#ifndef TEST
-#define TEST
+#pragma once
+
 #define clearPrinsplitt(y, x, ...) \
 do { \
 	mvhline((y), (x), ' ', 69); \
@@ -12,6 +12,12 @@ do { \
 		endwin();
 		exit(0);
 	}
+}
+
+void floatGetch(float f) {
+	mvhline(0, 0, ' ', 99);
+	mvprintw(0, 0, "%f", f);
+	quitGetch();
 }
 
 #define interactiveDebug(...) \
@@ -34,4 +40,3 @@ void getchPrintArr(int y, int x, int myArr[], int length) {
 	printArr(y, x, myArr, length);
 	quitGetch();
 }
-#endif

@@ -5,6 +5,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <string.h>
+#include <setjmp.h>
 
 #include "game_vars.h"
 #include "drawing.h"

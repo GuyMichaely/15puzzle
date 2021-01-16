@@ -4,6 +4,7 @@
 
 #include "undo.h"
 #include "drawing.h"
+#include "swap_ints.h"
 #include "game_vars.h"
 
 // randomizes ith element of game->cells with element of nums
@@ -70,11 +71,7 @@ void randomize(GameVars* game) {
 	i = 0;
 	while (i < length) {
 		if (i != copy[i]) {
-			// swap copy[i] and copy[copy[i]]
-			const int temp = copy[i];
-			copy[i] = copy[temp];
-			copy[temp] = temp;
-
+			swapInts(copy + i, copy + copy[i]);
 			parity = !parity; 
 		}   
 		else {
