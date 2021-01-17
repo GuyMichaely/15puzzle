@@ -15,13 +15,30 @@ typedef struct Coordinate{
 	int x;
 } Coordinate;
 
+typedef void (*CoordGetter)(GameVars*, int, Coordinate*); 
+typedef void (*SwapFunction)(GameVars*, int, int, char);
+
 jmp_buf exitAi; // buffer used for exiting ai when user hits 'c'
 
+// swap function used by ai
+void swap(GameVars *game, int swapy, int swapx, char undoDirection) {
+	// update coordinate of swapped cell
+	const int v = game->cells[game->y][game->x];
+	int newCoordinate = game->coordinates[v];
+	newCoordinate -= game->cols * swapy + swapx;
+	game->coordinates[v] = newCoordinate;
+
+	// swap the cells on screen and in game->cells
+	swap0(game, swapy, swapx, undoDirection);
+}
+
+// clear a splash screen message by index and message content
 static inline void clearMsg(const int y, char *msg) {
 	timeout(MOVE_DELAY_MS);
 	mvhline(y, (COLS - strlen(msg)) / 2, ' ', strlen(msg));
 }
 
+// clear the splash screen
 static inline void clearMsgs() {
 	nodelay(stdscr, true); // causes getch() to be non blocking
 	clearMsg(0, "What algorithm should be used to solve?");
@@ -31,7 +48,7 @@ static inline void clearMsgs() {
 
 }
 
-// sleeps and returns getch() == 'q' or 'Q'
+// getch() and return either 'c', 'q', or 0 depending on user input
 char statusGetch() {
 	const int c = getch();
 	switch (c) {
@@ -43,7 +60,7 @@ char statusGetch() {
 			nodelay(stdscr, false);
 			return 'c';
 	}
-	return false;
+	return 0;
 }
 
 // the algorithm to solve a row vs a column are the same, just transposed
@@ -53,18 +70,14 @@ char statusGetch() {
 // one for normal coordinates and the other for transposed
 
 // stores coordinate of v in *coord
-void getRealCoord(int v, GameVars *game, int coordinates[], Coordinate *coord) {
-	const int coord0 = game->cols * game->y + game->x;
-	if (v > coord0) {
-		v--;
-	}
-	coord->y = coordinates[v] / game->cols;
-	coord->x = coordinates[v] % game->cols;
+void getRealCoord(GameVars *game, int v, Coordinate *coord) {
+	coord->y = game->coordinates[v - 1] / game->cols;
+	coord->x = game->coordinates[v - 1] % game->cols;
 }
 
 // stores coordinate of v in *coord
-void getTransposedCoord(int v, GameVars *game, int coordinates[], Coordinate *coord) {
-	getRealCoord(v, game, coordinates, coord);
+void getTransposedCoord(int v, GameVars *game, Coordinate *coord) {
+	getRealCoord(game, v, coord);
 	swapInts(&(coord->y), &(coord->x));
 }
 
@@ -72,8 +85,8 @@ int *returnFirst(int *a, int *b){ return a; } // pass in to funAiEngine's transf
 // static inline void decrementFirst (int *f, int *s) { (*f)--; }
 // static inline void decrementSecond(int *f, int *s) { (*s)--; }
 
-void realSwap(GameVars *game, int swapy, int swapx, Move** undo, char direction) {
-	swap0(game, swapy, swapx, undo, direction);
+void realSwap(GameVars *game, int swapy, int swapx, char direction) {
+	swap0(game, swapy, swapx, direction);
 	switch (statusGetch()) { 
 		case 'c':
 			longjmp(exitAi, 1);
@@ -83,86 +96,144 @@ void realSwap(GameVars *game, int swapy, int swapx, Move** undo, char direction)
 	}
 }
 
-void transposeSwap(GameVars *game, int swapy, int swapx, Move** undo, char direction) {
-	realSwap(game, swapx, swapy, undo, direction);
+void transposeSwap(GameVars *game, int swapy, int swapx, char direction) {
+	realSwap(game, swapx, swapy, direction);
 }
 
 // assumes starting to the right of the cell
-void upRight(GameVars *game, Move** undo, void (*swapf)(GameVars*, int, int, Move**, char), int n) {
+void upRight(GameVars *game, SwapFunction swapf, int n) {
 	while (n--) {
-		swapf(game, 0, -1, undo, 'r');
-		swapf(game, 1, 0, undo, 'd');
-		swapf(game, 0, 1, undo, 'l');
+		swapf(game, 0, -1, 'r');
+		swapf(game, 1, 0, 'd');
+		swapf(game, 0, 1, 'l');
 		if (n--) {
-			swapf(game, -1, 0, undo, 'u');
-			swapf(game, 0, 1, undo, 'l');
-			swapf(game, 0, 1, undo, 'd');
+			swapf(game, -1, 0, 'u');
+			swapf(game, 0, 1, 'l');
+			swapf(game, 0, 1, 'd');
 		}
 	}
+}
+
+// all the positionFrom functions assume at least a 3x3 board
+// different functions will be used for the top 2 cells in a column
+
+// move 0 directly to the right of *a without
+// without moving in to *a
+// then move to the left in order to swap places with *a
+void positionFromRight(GameVars *game, Coordinate *a, SwapFunction swapf) {
+	// ensure 0 is not in same row as A before we move right
+	//
+	if (game->y == a->y) { // 0 in the same row as A
+		if (game->x < a->x) { // 0 to the left of A
+			if (game->y) { // there is a row above; move up to go around 
+				swapf(game, -1, 0, 'd');
+			}
+			else { // we are at the top row; move down to go around
+				swapf(game, 1, 0, 'u');
+			}
+		}
+		else {
+			// 0 in same row and to the right of a
+			// just need to move to the left
+			while (a->x < game->x) {
+				swapf(game, 0, -1, 'r');
+			}
+			return;
+		}
+	}
+	// 
+	// 0 is now not in the same row as A
+
+	// ensure 0 is to the right of A
+	while (game->x <= a->x) {
+		swapf(game, 0, 1, 'l');
+	}
+
+	// get 0 to the same row as A
+	while (game->y < a->y) {
+		swapf(game, 1, 0, 'u');
+	}
+	while (game->y > a->y) {
+		swapf(game, -1, 0, 'd');
+	}
+
+	// move 0 in to *a from the right
+	while (game->x > a->x) {
+		swapf(game, 0, -1, 'r');
+	}
+}
+
+// move 0 directly below *a without moving in to *a
+// and without moving in to previously solved cells (anything below *b)
+// then move up in order to swap places with *a
+void positionFromBottom(GameVars *game, Coordinate *a, SwapFunction swapf) {
+	if (game->x == a->x) {
+		if (game->y < a->y) {
+			// 0 is above *a
+			// need to move to move around so we can come in from below
+			if (game->x) { // if there is space to the left
+				swapf(game, 0, -1, 'r');
+			}
+			else {
+				swapf(game, 0, 1, 'l');
+			}
+		}
+		else {
+			// 0 is below *a
+			// move up until we swap with it
+			do {
+				swapf(game, -1, 0, 'd');
+			} while (game->y > a->y);
+			return;
+		}
+	}
+	//
+	// 0 is now not in the same colum  as *a
+	
+	// ensure 0 is below *a
+	while (game->y <= a->y) {
+		swapf(game, 1, 0 , 'u');
+	}
+
+	// get 0 to row below *a
+	while (game->y != a->y + 1) {
+		swapf(game, -1, 0, 'd');
+	}
+
+	// get 0 to directly below *a
+	while (game->x < a->x) {
+		swapf(game, 0, 1, 'l');
+	}
+	while (game->x > a->x) {
+		swapf(game, 0, -1, 'r');
+	}
+
+	// move up into *a
+	swapf(game, -1, 0, 'd');
 }
 
 // happens in 2 phases:
 // 	1. move 0 to the side of A it needs to be on
-// 		* if A is in a 45 deg diagonal to B, move 0 to whichever prouctive side
-// 		  of A is closest
-// 		* otherwise move it so the number of moves where A is moved 
-// 		  horizontally/vertically is minimised
 // 	2. move A diagonally until it's either in the same row or column as B
 // 	3. Move A in a horizontal/vertical line to B if neccesary
-void moveAToB(GameVars *game, Move** undo, Coordinate *a, Coordinate *b, int* (transformInts)(int*, int*), void (*swapf)(GameVars*, int, int, Move**, char)) {
+void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, int* (transformInts)(int*, int*), SwapFunction swapf) {
 	transformInts(&(game->x), &(game->y)); // must undo at end of function lest the real coordinates will be transposed
 	int dy, dx;
-	const int vertDist = a->y - b->y;
-	const int horDist = a->x - b->x;
-	if (horDist < vertDist * (vertDist < 0 ? -1 : 1)) {
-		// horizontal distance < vertical distance
-		
-		// ensure 0 is not in same row as A before we move right
-		//
-		if (game->y == a->y) { // 0 in the same row as A
-			if (game->x < a->x) { // 0 to the left of A
-				if (game->y) { // there is a row above; move up to go around 
-					swapf(game, -1, 0, undo, 'd');
-				}
-				else { // we are at the top row; move down to go around
-					swapf(game, 1, 0, undo, 'u');
-				}
-			}
-		}
-		// 
-		// 0 is now not in the same row and to the left of A
-		
-		// ensure 0 is to the right of A
-		while (game->x <= a->x) {
-			swapf(game, 0, 1, undo, 'l');
-		}
-
-		// get 0 to the same row as A
-		if (game->y != a->y) {
-			if (a->y > game->y) {
-				do {
-					swapf(game, 1, 0, undo, 'u');
-				} while (a->y != game->y);
-			}
-			else {
-				swapf(game, -1, 0, undo, 'd');
-			}
-		}
-
+	const int vertDist = b->y - a->y;
+	const int horDist = b->x - a->x;
+	if (abs(horDist) > abs(vertDist)) {
 		// get 0 directly to the right of A
-		while (game->x > a->x) {
-			swapf(game, 0, -1, undo, 'r');
-		}
-
+		// then move left in to it
+		positionFromRight(game, a, swapf);
 	}
-	else if (horDist > vertDist * (vertDist < 0 ? -1 : 1)) {
-		// horizontal distance < magintude of vert distance
-		if (vertDist < 0) {
-			// a is below b
-			dy = 1;
+	else if (abs(horDist) < abs(vertDist)) {
+		// vertical distance > horizontal distance
+		// need to figure out if must come from above or below
+		if (vertDist > 0) {
+			positionFromBottom(game, a, swapf);
 		}
 		else {
-			dy = -1;
+
 		}
 	}
 	else {
@@ -174,9 +245,9 @@ void moveAToB(GameVars *game, Move** undo, Coordinate *a, Coordinate *b, int* (t
 		 *  	  |XXXXXXXXXX
 		 *   	  |XXXXXXXXXX
 		 *        |XXXXXXXXXX
-		 *--------+-+XXXXXXXX
-		 *XXXXXXXX|A!XXXXXXXX
-		 *XXXXXXXX+!+--------
+		 *--------+XXXXXXXXXX
+		 *XXXXXXXXXA!XXXXXXXX
+		 *XXXXXXXXX!+--------
 		 *XXXXXXXXXX|
 		 *XXXXXXXXXX|
 		 *XXXXXXXXXX|	    B
@@ -201,52 +272,42 @@ void moveAToB(GameVars *game, Move** undo, Coordinate *a, Coordinate *b, int* (t
 // solve up to and including (col, row)
 // the solve direction is determined by corresponding functions passed in
 void funAiEngine(
-	GameVars *game, Move **undo, int coordinates[], int row, int col,
+	GameVars *game, int row, int col,
 	int* (*transformInts)(int*, int*),
-	void (*getCoord)(
-		int,
-		GameVars*,
-		int[],
-		Coordinate*
-	),
-	void (*swapf)(
-		GameVars*,
-		int,
-		int,
-		Move**,
-		char
-	)
+	CoordGetter getCoord,
+	SwapFunction swapf
 ) {
 	for (int *i = transformInts(&row, &col); *i > 1; (*i)--) {
 		Coordinate a;
-		getCoord(row * game->cols + col, game, coordinates, &a);
+		getCoord(game, row * game->cols + col, &a);
 		Coordinate b = {row, col};
 		transformInts(&(b.y), &(b.x));
-		moveAToB(game, undo, &a, &b, transformInts, swapf);
+		moveAToB(game, &a, &b, transformInts, swapf);
 	} 
 }
 
-void funAi(GameVars *game, Move **undo) {
+void funAi(GameVars *game) {
 	// make array of cell coordinates
 	const int length = game->rows * game->cols - 1;
 	int coordinates[length];
+	game->coordinates = coordinates;
 	int i = 0;
 	for (const int zeroCoord = game->y * game->cols + game->x; i < zeroCoord; i++) {
 		const int cell = game->cells[i / game->cols][i % game->cols];
-		coordinates[cell - 1] = i;
+		game->coordinates[cell - 1] = i;
 	}
 
 	i++; // skip over 0
 	for (; i < length; i++) {
 		const int cell = game->cells[i / game->cols][i % game->cols];
-		coordinates[cell - 1] = i;
+		game->coordinates[cell - 1] = i;
 	}
 
 	// make it so there are as many unsolved rows as unsolved columns
 	if (game->cols > game->rows) { // if more columns than rows
 		int i = game->cols - game->rows;
 		do {
-			funAiEngine(game, undo, coordinates, game->rows - 1, game->rows - 1 + i, returnFirst, getRealCoord, realSwap);
+			funAiEngine(game, game->rows - 1, game->rows - 1 + i, returnFirst, getRealCoord, realSwap);
 		} while (--i);
 	}
 	else if (game->rows < game->cols) {
@@ -257,14 +318,14 @@ void funAi(GameVars *game, Move **undo) {
 	// solve rows and columns one after another until we get to a 2x2
 	// for (int i = 0; i < game->rows - 2; i++) {
 	//         const int cornerIndex = game->rows - 1 - i;
-	//         funAiEngine(game, undo, cornerIndex, cornerIndex);
-	//         funAiEngine(game, undo, cornerIndex, cornerIndex - 1);
+	//         funAiEngine(game, cornerIndex, cornerIndex);
+	//         funAiEngine(game, cornerIndex, cornerIndex - 1);
 	// }
 
 	// now solve the 2x2
 }
 
-void ai(GameVars *game, Move **undo) {
+void ai(GameVars *game) {
 	// jumped to by transposeSwap and realSwap when user hits 'c'
 	if (setjmp(exitAi)) {
 		timeout(0);
@@ -285,7 +346,7 @@ void ai(GameVars *game, Move **undo) {
 				exit(0);
 			case '0':
 				clearMsgs();
-				funAi(game, undo);
+				funAi(game);
 				return;
 		}
 	}

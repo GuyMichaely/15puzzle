@@ -111,15 +111,14 @@ void swap0NoUndo(GameVars *game, int swapy, int swapx) {
 
 // swap 0 cell with (swapy, swapx)
 // add the swap to the undo list
-void swap0(GameVars *game, const int swapy, const int swapx, Move **undo, const char undoDirection) {
+void swap0(GameVars *game, const int swapy, const int swapx, const char undoDirection) {
 	swap0NoUndo(game, swapy, swapx);
-
 
 	// add move to undo list
 	Move* newMove = malloc(sizeof(Move));
 	newMove->move = undoDirection;
-	newMove->prev = *undo;
-	*undo = newMove;
+	newMove->prev = game->undo;
+	game->undo = newMove;
 
 	refresh();
 }

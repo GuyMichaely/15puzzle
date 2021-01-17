@@ -1,5 +1,6 @@
 #pragma once
 
+#include "undo.h"
 typedef struct GameVars {
 	int **cells;
 	int *yCoords;
@@ -8,4 +9,6 @@ typedef struct GameVars {
 	int cols;
 	int y;
 	int x;
+	Move *undo;
+	int* coordinates;
 } GameVars;

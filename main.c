@@ -15,9 +15,10 @@
 /* #include "test.h" */
 
 // undo the move represented by **move
-void undoMove(GameVars *game, Move **move) {
-	if (*move != NULL) {
-		switch ((*move)->move) {
+void undoMove(GameVars *game) {
+	if (game->undo != NULL) {
+		// perform most recent undo
+		switch (game->undo->move) {
 			case 'u':
 				swap0NoUndo(game, -1, 0);
 				break;
@@ -31,14 +32,15 @@ void undoMove(GameVars *game, Move **move) {
 				swap0NoUndo(game, 0, 1);
 				break;
 		}
-		const Move *toFree = *move;
-		*move = (*move)->prev;
+
+		// delete most recent undo
+		const Move *toFree = game->undo;
+		game->undo = game->undo->prev;
 		free(toFree);
 	}
 }
 
 int main(int argc, char *argv[]) {
-	GameVars game;
 	bool needToSeed = true;
 	long int seed;
 
@@ -65,6 +67,7 @@ int main(int argc, char *argv[]) {
 		seed = time(0);
 		srand(seed);
 	}
+	GameVars game;
 	argc -= optind;
 	if (argc == 0) {
 		game.cols = game.rows = 4;
@@ -90,11 +93,8 @@ int main(int argc, char *argv[]) {
 	game.yCoords = malloc(game.rows * sizeof(int));
 	game.xCoords = malloc(game.cols * sizeof(int));
 	game.y = game.x = 0;
+	game.undo = NULL;
 	init(&game);
-
-	game.x = game.y = 0;
-
-	Move* undo = NULL;
 
 	// game loop
 	while ((c = getch()) != 'q' && c != 'Q') {
@@ -106,49 +106,49 @@ int main(int argc, char *argv[]) {
 				continue;
 			// undo move
 			case 'u':
-				undoMove(&game, &undo);
+				undoMove(&game);
 				continue;
 			// randomize board
 			case 'r':
 				randomize(&game);
 			case 'c':
-				freeMoves(undo);
-				undo = NULL;
+				freeMoves(game.undo);
+				game.undo = NULL;
 				continue;
 			// ai solve
 			case 'a':
 			{
-				ai(&game, &undo);
+				ai(&game);
 				continue;
 			}
 			// movement controls
 			case KEY_UP:
 			case 'k':
 				if (game.y != 0) {
-					swap0(&game, -1, 0, &undo, 'd');
+					swap0(&game, -1, 0, 'd');
 				}
 				continue;
 			case KEY_DOWN:
 			case 'j':
 				if (game.y != game.rows - 1) {
-					swap0(&game, 1, 0, &undo, 'u');
+					swap0(&game, 1, 0, 'u');
 				}
 				continue;
 			case KEY_LEFT:
 			case 'h':
 				if (game.x != 0) {
-					swap0(&game, 0, -1, &undo, 'r');
+					swap0(&game, 0, -1, 'r');
 				}
 				continue;
 			case KEY_RIGHT:
 			case 'l':
 				if (game.x != game.cols - 1) {
-					swap0(&game, 0, 1, &undo, 'l');
+					swap0(&game, 0, 1, 'l');
 				}
 				continue;
 		}
 	}
 
-	freeMoves(undo);
+	freeMoves(game.undo);
 	endwin();
 }
