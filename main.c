@@ -40,9 +40,14 @@ void undoMove(GameVars *game) {
 	}
 }
 
+long int seed; // remove after done with debug and replace with decleration in main
+void printSeed() {
+	printf("seed: %lii\n", seed);
+}
 int main(int argc, char *argv[]) {
+	atexit(printSeed);
 	bool needToSeed = true;
-	long int seed;
+	//long int seed; // uncomment after debug
 
 	// cmd line parsing
 	opterr = 0;
