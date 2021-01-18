@@ -8,6 +8,15 @@
 #include "game_vars.h"
 #include "test.h"
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
+// quality of life macros for programming the ai
+#define UP() swap(game, -1, 0, 'd')
+#define DOWN() swap(game, 1, 0, 'u')
+#define LEFT() swap(game, 0, -1, 'r')
+#define RIGHT() swap(game, 0, 1, 'l')
+
 #define MOVE_DELAY_MS -1
 
 typedef struct Coordinate{
@@ -15,7 +24,7 @@ typedef struct Coordinate{
 	int x;
 } Coordinate;
 
-typedef void (*SwapFunction)(GameVars*, Coordinate*, int, int, char);
+typedef void (*SwapFunction)(GameVars*, int, int, char);
 
 typedef struct GridTransforms {
 	void (*getCoord)(GameVars*, int, Coordinate*); 
@@ -82,7 +91,8 @@ void getTransposedCoord(GameVars *game, int v, Coordinate *coord) {
 int *returnFirst(int *a, int *b){ return a; }
 int *returnSecond(int *a, int *b){ return b; }
 
-void realSwap(GameVars *game, Coordinate *transformedCoord, int swapy, int swapx, char direction) {
+
+void realSwap(GameVars *game, int swapy, int swapx, char direction) {
 	// update coordinate of swapped cell
 	const int v = game->cells[game->y + swapy][game->x + swapx];
 	int newCoordinate = game->coordinates[v - 1];
@@ -100,13 +110,11 @@ void realSwap(GameVars *game, Coordinate *transformedCoord, int swapy, int swapx
 		case 'p':
 			printArr(0, 0, game->coordinates, game->rows * game->cols - 1);
 			quitGetch();
+			mvhline(0, 0, ' ', 255);
 	}
-
-	transformedCoord->y = game->y;
-	transformedCoord->x = game->x;
 }
 
-void transposedSwap(GameVars *game, Coordinate *transformedCoord, int swapy, int swapx, char direction) {
+void transposedSwap(GameVars *game, int swapy, int swapx, char direction) {
 	switch (direction) {
 		case 'r':
 			direction = 'd';
@@ -120,23 +128,104 @@ void transposedSwap(GameVars *game, Coordinate *transformedCoord, int swapy, int
 		case 'd':
 			direction = 'r';
 	}
-	realSwap(game, transformedCoord, swapx, swapy, direction);
-	swapInts(&transformedCoord->y, &transformedCoord->x);
+	realSwap(game, swapx, swapy, direction);
 }
 
 // assumes starting to the left of the cell
-// void upRight(GameVars *game, SwapFunction swap, int n) {
-//         while (n--) {
-//                 swap(game, 0, -1, 'r');
-//                 swap(game, 1, 0, 'd');
-//                 swap(game, 0, 1, 'l');
-//                 if (n--) {
-//                         swap(game, -1, 0, 'u');
-//                         swap(game, 0, 1, 'l');
-//                         swap(game, 0, 1, 'd');
-//                 }
-//         }
-// }
+void upRight(GameVars *game, SwapFunction swap, int n) {
+	while (n-- > 0) {
+		UP();
+		RIGHT();
+		DOWN();
+		if (n-- > 0) {
+			RIGHT();
+			UP();
+			LEFT();
+		}
+	}
+}
+
+// assumes starting above the cell
+void downRight(GameVars *game, SwapFunction swap, int n) {
+	while (n-- > 0) {
+		RIGHT();
+		DOWN();
+		LEFT();
+		if (n-- > 0) {
+			DOWN();
+			RIGHT();
+			UP();
+		}
+	}
+}
+
+// assumes starting to the left of the cell
+void shiftRightD(GameVars *game, SwapFunction swap, int n) {
+	while (n-- > 0) {
+		UP();
+		RIGHT();
+		RIGHT();
+		DOWN();
+		LEFT();
+	}
+}
+
+// assumes starting to the left of the cell
+void shiftRightU(GameVars *game, SwapFunction swap, int n) {
+	while (n-- > 0) {
+		DOWN();
+		RIGHT();
+		RIGHT();
+		UP();
+		LEFT();
+	}
+}
+
+// assumes starting below cell
+void shiftDown(GameVars *game, SwapFunction swap, int n) {
+	while (n-- > 0) {
+		LEFT();
+		UP();
+		UP();
+		RIGHT();
+		DOWN();
+	}
+}
+
+// assumes starting above cell
+void shiftUp(GameVars *game, SwapFunction swap, int n) {
+	while (n-- > 0) {
+		LEFT();
+		DOWN();
+		DOWN();
+		RIGHT();
+		UP();
+	}
+}
+
+void moveLeftFor(GameVars *game, SwapFunction swap, int n) {
+	while (n-- > 0) {
+		LEFT();
+	}
+}
+
+void moveRightFor(GameVars *game, SwapFunction swap, int n) {
+	while (n-- > 0) {
+		RIGHT();
+	}
+}
+
+void moveDownFor(GameVars *game, SwapFunction swap, int n) {
+	while (n-- > 0) {
+		DOWN();
+	}
+}
+
+void moveUpFor(GameVars *game, SwapFunction swap, int n) {
+	while (n-- > 0) {
+		UP();
+	}
+}
 
 // all the positionFrom functions assume at least a 3x3 board
 // different functions will be used for the top 2 cells in a column
@@ -146,50 +235,55 @@ void transposedSwap(GameVars *game, Coordinate *transformedCoord, int swapy, int
 // then move to the left in order to swap places with *a
 void positionFromRight(GameVars *game, Coordinate *a, GridTransforms *funcs) {
 	interactiveDebug("fromRight");
-	Coordinate transformedCoord = {game->y, game->x};
-	funcs->transformInts(&transformedCoord.y, &transformedCoord.x);
+	int transx, transy;
+	transy = game->y;
+	transx = game->x;
+	funcs->transformInts(&transy, &transy);
 	const SwapFunction swap = funcs->swap;
 
-	// ensure 0 is not in same row as A before we move right
-	//
-	if (transformedCoord.y == a->y) { // 0 in the same row as A
-		if (transformedCoord.x < a->x) { // 0 to the left of A
-			if (transformedCoord.y) { // there is a row above; move up to go around 
-				swap(game, &transformedCoord, -1, 0, 'd');
+	if (transy == a->y) { // 0 in the same row as A
+		interactiveDebug("transy == a->y");
+		if (transx < a->x) { // 0 to the left of A
+			interactiveDebug("transx < a->x");
+			if (transy) { // there is a row above; move up to go around 
+				interactiveDebug("transy");
+				UP();
+				moveRightFor(game, swap, a->x - transx + 1);
+				DOWN();
+
 			}
 			else { // we are at the top row; move down to go around
-				swap(game, &transformedCoord, 1, 0, 'u');
+				interactiveDebug("!transy");
+				DOWN();
+				moveRightFor(game, swap, a->x - transx + 1);
+				UP();
 			}
+			LEFT();
 		}
 		else {
-			// 0 in same row and to the right of a
+			interactiveDebug("transx>= a->x");
+			// 0 in same row and to the right of *a
 			// just need to move to the left
-			while (a->x < transformedCoord.x) {
-				swap(game, &transformedCoord, 0, -1, 'r');
+			for (int i = transx - a->x; i; i--) {
+				LEFT();
 			}
-			return;
 		}
-	}
-	// 
-	// 0 is now not in the same row as A
-
-	// ensure 0 is to the right of A
-	while (transformedCoord.x <= a->x) {
-		swap(game, &transformedCoord, 0, 1, 'l');
+		return;
 	}
 
-	// get 0 to the same row as A
-	while (transformedCoord.y < a->y) {
-		swap(game, &transformedCoord, 1, 0, 'u');
-	}
-	while (transformedCoord.y > a->y) {
-		swap(game, &transformedCoord, -1, 0, 'd');
-	}
+	// 0 is not in the same row as *a
 
-	// move 0 in to *a from the right
-	do {
-		swap(game, &transformedCoord, 0, -1, 'r');
-	} while (transformedCoord.x > a->x);
+	// ensure 0 is to the right of *a
+	moveRightFor(game, swap, a->x + 1 - transx);
+
+	// ensure 0 is in the column directly to the right of *a
+	moveLeftFor(game, swap, transx - (a->x + 1));
+
+	// get 0 directly to the right of *a
+	moveUpFor(game, swap, transy - a->y);
+	moveDownFor(game, swap, a->y - transy);
+
+	LEFT();
 }
 
 // move 0 directly below *a without moving in to *a
@@ -197,113 +291,106 @@ void positionFromRight(GameVars *game, Coordinate *a, GridTransforms *funcs) {
 // then move up in order to swap places with *a
 void positionFromBottom(GameVars *game, Coordinate *a, GridTransforms *funcs) {
 	interactiveDebug("fromBottom");
-	Coordinate transformedCoord = {game->y, game->x};
-	funcs->transformInts(&transformedCoord.y, &transformedCoord.x);
+	int transx, transy;
+	transy = game->y;
+	transx = game->x;
+	funcs->transformInts(&transy, &transy);
 	const SwapFunction swap = funcs->swap;
 
-	if (transformedCoord.x == a->x) {
-		interactiveDebug("transformedCoord.x == a->x");
-		if (transformedCoord.y < a->y) {
-			interactiveDebug("transformedCoord.y < a->y");
+	if (transx == a->x) {
+		interactiveDebug("transx == a->x");
+		if (transy < a->y) {
+			interactiveDebug("transy < a->y");
 			// 0 is above *a
 			// need to move to move around so we can come in from below
-			if (transformedCoord.x) { // if there is space to the left
-				interactiveDebug("transformedCoord.x");
-				swap(game, &transformedCoord, 0, -1, 'r');
+			if (transx) { // if there is space to the left
+				interactiveDebug("transx");
+				LEFT();
+				moveDownFor(game, swap, a->y + 1 - transy);
+				RIGHT();
 			}
 			else {
-				interactiveDebug("!transformedCoord.x");
-				swap(game, &transformedCoord, 0, 1, 'l');
+				interactiveDebug("!transx");
+				RIGHT();
+				moveDownFor(game, swap, a->y + 1 - transy);
+				LEFT();
 			}
+			UP();
 		}
 		else {
-			interactiveDebug("transformedCoord.y >= a->y");
+			interactiveDebug("transy >= a->y");
 			// 0 is below *a
 			// move up until we swap with it
-			do {
-				swap(game, &transformedCoord, -1, 0, 'd');
-			} while (transformedCoord.y > a->y);
-			return;
+			moveUpFor(game, swap, transy - a->y);
 		}
+		return;
 	}
-	//
-	// 0 is now not in the same colum  as *a
+	
+	// 0 is not in same column as a*
 	
 	// ensure 0 is below *a
-	while (transformedCoord.y <= a->y) {
-		interactiveDebug("transformedCoord.y <= a->y");
-		swap(game, &transformedCoord, 1, 0 , 'u');
-	}
+	moveDownFor(game, swap, a->y + 1 - transy);
 
 	// get 0 to row below *a
-	while (transformedCoord.y != a->y + 1) {
-		interactiveDebug("transformedCoord.y != a->y + 1");
-		swap(game, &transformedCoord, -1, 0, 'd');
-	}
+	moveUpFor(game, swap, transy - (a->y + 1));
 
 	// get 0 to directly below *a
-	while (transformedCoord.x < a->x) {
-		interactiveDebug("transformedCoord.x < a->x");
-		swap(game, &transformedCoord, 0, 1, 'l');
-	}
-	while (transformedCoord.x > a->x) {
-		interactiveDebug("transformedCoord.x > a->x");
-		swap(game, &transformedCoord, 0, -1, 'r');
-	}
-
+	moveLeftFor(game, swap, transx - a->x);
+	moveRightFor(game, swap, a->x - transx);
+	
 	// move up into *a
-	swap(game, &transformedCoord, -1, 0, 'd');
+	UP();
 }
 
 // move 0 directly above *a without moving in to *a
 // and without moving in to previously solved cells (anything below *b)
 // then move down in order to swap places with *a
 void positionFromTop(GameVars *game, Coordinate *a, GridTransforms *funcs) {
-	Coordinate transformedCoord = {game->y, game->x};
-	funcs->transformInts(&transformedCoord.y, &transformedCoord.x);
+	interactiveDebug("fromTop");
+	int transx, transy;
+	transy = game->y;
+	transx = game->x;
+	funcs->transformInts(&transy, &transy);
 	const SwapFunction swap = funcs->swap;
 	
-	if (transformedCoord.x == a->x) {
+	if (transx == a->x) {
 		// 0 is in same column as *a
-		if (transformedCoord.y < a->y) {
+		if (transy < a->y) {
 			// 0 is in same column and above *a
 			// just need to move down past *a
-			do {
-				swap(game, &transformedCoord, 0, 1, 'u');
-			} while (transformedCoord.y < a->y);
-			return;
+			moveDownFor(game, swap, a->y - transy);
 		}
 		else {
 			// 0 is in same column and below *a
 			// need to move to adjacent column to go around
-			if (transformedCoord.x) { // if room on left
-				swap(game, &transformedCoord, 0, -1, 'r');
+			if (transx) { // if room on left
+				LEFT();
+				moveUpFor(game, swap, transy - (a->y - 1));
+				RIGHT();
 			}
 			else {
-				swap(game, &transformedCoord, 0, 1, 'l');
+				RIGHT();
+				moveUpFor(game, swap, transy - (a->y - 1));
+				LEFT();
 			}
+			DOWN();
 		}
+		return;
 	}
-	//
-	// 0 is now not in same column as *a
+	
+	// 0 is not in same column as *a
 	
 	// get 0 above *a
-	while (transformedCoord.y > a->y) {
-		swap(game, &transformedCoord, -1, 0, 'd');
-	}
+	moveUpFor(game, swap, transy - (game->y - 1));
 
-	// get 0 to same column as *a
-	while (transformedCoord.x < a->x) {
-		swap(game, &transformedCoord, 0, 1, 'l');
-	}
-	while (transformedCoord.x > a->x) {
-		swap(game, &transformedCoord, 0, -1, 'r');
-	}
+	// get 0 to row above *a
+	moveDownFor(game, swap, (game->y - 1) - transy);
 
-	// 0 is now in same column and above *a; move down
-	do {
-		swap(game, &transformedCoord, 1, 0, 'u');
-	} while (transformedCoord.y < a->y);
+	// get 0 to cell above *a
+	moveLeftFor(game, swap, transx - a->x);
+	moveRightFor(game, swap, a->x - transx);
+
+	DOWN();
 }
 
 // happens in 2 phases:
@@ -313,27 +400,27 @@ void positionFromTop(GameVars *game, Coordinate *a, GridTransforms *funcs) {
 void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, GridTransforms *funcs) {
 	const int vertDist = b->y - a->y;
 	const int horDist = b->x - a->x;
-	void (*positionFunction)(GameVars*, Coordinate*, GridTransforms*);
-	if (abs(horDist) > abs(vertDist)) {
-		// get 0 directly to the right of A
-		// then move left in to it
-		positionFunction = positionFromRight;
-	}
-	else if (abs(horDist) < abs(vertDist)) {
-		// vertical distance > horizontal distance
-		// need to figure out if must come from above or below
-		if (vertDist > 0) {
-			positionFunction = positionFromBottom;
+	const SwapFunction swap = funcs->swap;
+	interactiveDebug("vertDist: %i", vertDist);
+	if (vertDist >= 0) { // a* is above b*
+		if (horDist > vertDist) { // more distance horizontally than vertically
+			positionFromRight(game, a, funcs);
+			downRight(game, swap, 2 * vertDist);
+			shiftRightU(game, swap, b->x - (a->x + 1));
 		}
-		else {
-			positionFunction = positionFromTop;
+		else if (horDist < vertDist) { // more distance vertically than horizontally
+			positionFromBottom(game, a, funcs);
+			// (vertDist - 1)
+			// because vertical distance changed by 1 in positionFromBottom
+			interactiveDebug("2 * (vertDist - 1): %i", 2 * (vertDist - 1));
+			downRight(game, swap, 2 * (vertDist - 1));
+			
+			shiftDown(game, swap, b->x - a->x - (vertDist - 1));
 		}
-	}
-	else {
+
 		// vertical and horizontal distances are equal
 		// where you must go is determined by which side is closer
 		//
-		// given equal horizontal and vertical distances:
 		/*	  |XXXXXXXXXX
 		 *  	  |XXXXXXXXXX
 		 *   	  |XXXXXXXXXX
@@ -349,35 +436,150 @@ void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, GridTransforms *func
 		 * A is the src cell and B the goal
 		 * if the 0 is in either of the areas marked X there is an optimal side to choose
 		 * that side is marked by the corresponding '!'
-		 * if A is below B, flip the diagram upside down
-		*/
-		if (vertDist > 0) {
-			// corresponds to situation in diagram
-			// if 0 in upper right quadrant send to right of a*
-			// otherwise send below *a
-			funcs->transformInts(&game->y, &game->x);
-			if (a->x <= game->x && game->y <= a->y) {
-				positionFunction = positionFromRight;
-			}
-			else {
-				positionFunction = positionFromBottom;
-			}
-			funcs->transformInts(&game->y, &game->x);
+		 */
+		// if 0 in top right quadrant positionFromRight
+		// otherwise positionFromBottom because it is either correct or irrelevant
+		else if (a->x <= game->x && a->y <= game->y) {
+			positionFromRight(game, a, funcs);
+			interactiveDebug("2 * vertDist - 1: %i", 2 * vertDist - 1);
+			shiftRightD(game, swap, 2 * vertDist - 1);
 		}
 		else {
-			// if 0 in bottom right quadrant send to right of a*
-			// otherwise send above *a
-			funcs->transformInts(&game->y, &game->x);
-			if (a->x <= game->x && a->y <= game->y) {
-				positionFunction = positionFromRight;
-			}
-			else {
-				positionFunction = positionFromTop;
-			}
-			funcs->transformInts(&game->y, &game->x);
+			positionFromBottom(game, a, funcs);
+			downRight(game, swap, 2 * vertDist - 1);
 		}
 	}
-	positionFunction(game, a, funcs);
+	else {
+		// A is below B
+		// this is a pain because we aren't allowed to enter any cells below B
+		// because they're already been set correctly
+		
+		// an important value is int k = b->x - b->y - a->x - a->y
+		// there are 4 scenarios:
+		// 0. k is wrong
+		// 	- 
+		// 1. k > 1
+		// 	- positioning from the right as at minimum as efficient as from above
+		// 	- do 2*(a->y - b->y) cycles
+		// 	- then shift right b->x - a->x - 2 cycles
+		// 2. k == 1
+		//	- positioning from the top is at minimum as efficient as from the right
+		//	- do 1 + 2 * (a->y - b->y - 1) cycles
+		//	- then shift right
+		// 3. k <= 0
+		//	- positioning from the top is at minimum as efficient as from the right
+		//	- do 2 * (a->x - b->x - 1) cycles
+		//	- do a->y - b->y - 2 upshifts
+		//	- then move down and 360
+
+		const int k = b->x - b->y - a->x - a->y;
+		if (k > 1) {
+			positionFromRight(game, a, funcs);
+			upRight(game, swap, 2 * (a->y - b->y));
+			shiftRightU(game, swap, b->x - a->x - 2);
+		}
+		else if (k == 1) {
+			positionFromTop(game, a, funcs);
+			RIGHT();
+			DOWN();
+			LEFT();
+			upRight(game, swap, 2 * (a->y - b->y - 1));
+			shiftRightU(game, swap, 1);
+		}
+		else {
+			positionFromTop(game, a, funcs);
+			upRight(game, swap, 2 * (a->x - b->x - 1));
+			shiftUp(game, swap, 2);
+			// "360"
+			LEFT();
+			UP();
+			UP();
+			RIGHT();
+			RIGHT();
+			DOWN();
+			LEFT();
+		}
+	}
+
+
+
+
+
+
+
+        //
+	// if (abs(horDist) > abs(vertDist)) {
+	//         // get 0 directly to the right of A
+	//         // then move left in to it
+	//         positionFunction = &positionFromRight;
+	// }
+	// else if (abs(horDist) < abs(vertDist)) {
+	//         // vertical distance > horizontal distance
+	//         // need to figure out if must come from above or below
+	//         if (vertDist > 0) {
+	//                 positionFunction = &positionFromBottom;
+	//         }
+	//         else {
+	//                 positionFunction = &positionFromTop;
+	//         }
+	// }
+	// else {
+	//         if (vertDist > 0) {
+	//                 // corresponds to situation in diagram
+	//                 // if 0 in upper right quadrant send to right of a*
+	//                 // otherwise send below *a
+	//                 funcs->transformInts(&game->y, &game->x);
+	//                 if (a->x <= game->x && game->y <= a->y) {
+	//                         positionFunction = &positionFromRight;
+	//                 }
+	//                 else {
+	//                         positionFunction = &positionFromBottom;
+	//                 }
+	//                 funcs->transformInts(&game->y, &game->x);
+	//         }
+	//         else {
+	//                 // if 0 in bottom right quadrant send to right of a*
+	//                 // otherwise send above *a
+	//                 funcs->transformInts(&game->y, &game->x);
+	//                 if (a->x <= game->x && a->y <= game->y) {
+	//                         positionFunction = &positionFromRight;
+	//                 }
+	//                 else {
+	//                         positionFunction = &positionFromTop;
+	//                 }
+	//                 funcs->transformInts(&game->y, &game->x);
+	//         }
+	// }
+	// positionFunction(game, a, funcs);
+        //
+	// // now move tile to final destination
+	// if (positionFunction == &positionFromRight) {
+	//         if (vertDist > 0) {
+	//                 // use upRight
+	//                 // because we're using psotionFromRight we know there's at least
+	//                 // as much space on the right as the top
+	//                 // meaning we can't go out of bounds on the right
+	//                 // we can make an illegal move if *a and *b form a square
+        //
+	//                 const int cycles= 2 * MIN(vertDist, horDist) - (vertDist == horDist);
+	//                 upRight(game, &transformedCoord, funcs->swap, cycles);
+	//
+	//         }
+	//         else {
+	//                 // use downRight
+	//                 // similar logic for upRight but upside down
+	//                 // no illegal moves here only out of bounds
+	//                 const int cycles = 2 * MIN(-vertDist, horDist);
+	//                 downRight(game, &transformedCoord, funcs->swap, cycles);
+	//                 shiftRightU(game, &transformedcoord, funcs->swap, b->x - a->x);
+	//         }
+	// }
+	// else if (positionFunction == &positionFromBottom) {
+	//
+	// }
+	// else { // positionFromTop
+	//
+	// }
 }
 
 // solve a column/tranposed column of the grid
@@ -385,17 +587,19 @@ void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, GridTransforms *func
 // the solve direction is determined by corresponding functions passed in
 void funAiColumn(GameVars *game, GridTransforms *funcs, int row, int col) {
 	printArr(1, 0, game->coordinates, game->rows * game->cols - 1);
-	// interactiveDebug("New column");
+	statusGetch();
 	mvhline(1, 0, ' ', 255);
 	for (int *i = funcs->returnNth(&row, &col); *i > 1; (*i)--) {
+		interactiveDebug("new cell");
 		Coordinate a;
 		funcs->getCoord(game, row * game->cols + col, &a);
+		interactiveDebug("(a->y, a->x): (%i, %i)", a.y, a.x);
 		Coordinate b = {row, col};
 		funcs->transformInts(&(b.y), &(b.x));
-		// interactiveDebug("a coords: (%i, %i) b coords (y, x): (%i, %i)", a.y, a.x, b.y, b.x);
 		moveAToB(game, &a, &b, funcs);
-		printArr(0, 0, game->coordinates, game->rows * game->cols - 1);
-		quitGetch();
+		printArr(1, 0, game->coordinates, game->rows * game->cols - 1);
+		statusGetch();
+		mvhline(1, 0, ' ', 255);
 	} 
 }
 
@@ -408,11 +612,13 @@ void funAi(GameVars *game) {
 	for (const int zeroCoord = game->y * game->cols + game->x; i < zeroCoord; i++) {
 		const int cell = game->cells[i / game->cols][i % game->cols];
 		game->coordinates[cell - 1] = i;
+		// interactiveDebug("%i", cell);
 	}
 	i++; // skip over 0
-	for (; i < length; i++) {
+	for (; i < length + 1; i++) {
 		const int cell = game->cells[i / game->cols][i % game->cols];
 		game->coordinates[cell - 1] = i;
+		// interactiveDebug("%i", cell);
 	}
 
 	// make it so there are as many unsolved rows as unsolved columns
@@ -456,6 +662,7 @@ void funAi(GameVars *game) {
 		funcs.returnNth = &returnSecond;
 		funcs.transformInts = &swapInts;
 		funcs.swap = &transposedSwap;
+		interactiveDebug("transposing");
 		funAiColumn(game, &funcs, cornerindex, cornerindex - 1);
 	}
 
