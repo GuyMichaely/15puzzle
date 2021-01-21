@@ -87,7 +87,6 @@ char statusGetch() {
 
 // stores coordinate of v in *coord
 void getRealCoord(GameVars *game, int v, Coordinate *coord) {
-	interactiveDebug("finding %i", v);
 	coord->y = game->coordinates[v - 1] / game->cols;
 	coord->x = game->coordinates[v - 1] % game->cols;
 }
@@ -248,7 +247,7 @@ void positionFromRight(GameVars *game, Coordinate *a, GridTransforms *funcs) {
 	int transx, transy;
 	transy = game->y;
 	transx = game->x;
-	funcs->transformInts(&transy, &transy);
+	funcs->transformInts(&transx, &transy);
 	const SwapFunction swap = funcs->swap;
 
 	if (transy == a->y) { // 0 in the same row as A
@@ -360,7 +359,7 @@ void positionFromTop(GameVars *game, Coordinate *a, GridTransforms *funcs) {
 	int transx, transy;
 	transy = game->y;
 	transx = game->x;
-	funcs->transformInts(&transy, &transy);
+	funcs->transformInts(&transx, &transy);
 	const SwapFunction swap = funcs->swap;
 	
 	if (transx == a->x) {
@@ -418,18 +417,19 @@ void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, GridTransforms *func
 	interactiveDebug("vertDist: %i", vertDist);
 	if (vertDist >= 0) { // a* is above b*
 		if (horDist > vertDist) { // more distance horizontally than vertically
+			interactiveDebug("horDist > vertDist: %i", horDist > vertDist);
 			positionFromRight(game, a, funcs);
 			if (vertDist) {
+				interactiveDebug("down right up");
 				DOWN();
 				RIGHT();
 				UP();
 			}
 			downRight(game, swap, 2 * vertDist - 1);
-			// If vertDist > 0, the above line will move a ro the right by 1
-			// i.e. if vertDist == 0 a will be 1 to the left of where
-			// i am expecting it
-			// therefore I add !!vertDist to account
-			shiftRightU(game, swap, b->x - (a->x + 1 + !!vertDist));
+			const int alreadyTraveled = 1 + vertDist; // positionFromRight moves it over by 1
+			 					  // then downRight moves it over by vertDist
+								 
+			shiftRightU(game, swap, b->x - a->x - alreadyTraveled);
 		}
 		else if (horDist < vertDist) { // more distance vertically than horizontally
 			positionFromBottom(game, a, funcs);
@@ -510,7 +510,7 @@ void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, GridTransforms *func
 				LEFT();
 				upRight(game, swap, 2 * horDist - 3);
 			}
-			shiftUp(game, swap, a->y - b->y - 1);
+			shiftUp(game, swap, -vertDist - horDist);
 			DO360();
 		}
 		else if (k == 0) {
@@ -520,7 +520,6 @@ void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, GridTransforms *func
 			DO360();
 		}
 		else {
-			interactiveDebug("showFeet");
 			positionFromRight(game, a, funcs);
 			interactiveDebug("-2 * vertDist - 1: %i", -2 * vertDist - 1);
 			upRight(game, swap, -2 * vertDist - 1);
@@ -534,8 +533,6 @@ void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, GridTransforms *func
 // solve up to and including (col, row)
 // the solve direction is determined by corresponding functions passed in
 void funAiColumn(GameVars *game, GridTransforms *funcs, int row, int col) {
-	printArr(1, 0, game->coordinates, game->rows * game->cols - 1);
-	statusGetch();
 	mvhline(1, 0, ' ', 255);
 	for (int *i = funcs->returnNth(&row, &col); *i > 1; (*i)--) {
 		interactiveDebug("new cell");
@@ -543,10 +540,9 @@ void funAiColumn(GameVars *game, GridTransforms *funcs, int row, int col) {
 		funcs->getCoord(game, row * game->cols + col, &a);
 		interactiveDebug("(a->y, a->x): (%i, %i)", a.y, a.x);
 		Coordinate b = {row, col};
-		funcs->transformInts(&(b.y), &(b.x));
+		funcs->transformInts(&b.y, &b.x);
+		interactiveDebug("(b->y, b->x): (%i, %i)", b.y, b.x);
 		moveAToB(game, &a, &b, funcs);
-		printArr(1, 0, game->coordinates, game->rows * game->cols - 1);
-		statusGetch();
 		mvhline(1, 0, ' ', 255);
 	} 
 }
