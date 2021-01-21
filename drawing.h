@@ -97,13 +97,13 @@ void swap0NoUndo(GameVars *game, int swapy, int swapx) {
 	const bool swapXOnRight = swapx >= (game->cols + 1) / 2;
 
 	clearSpot(game->yCoords[game->y], game->xCoords[game->x], 0, xOnRight);
-	drawNum(game->yCoords[game->y], game->xCoords[game->x], game->cells[swapy][swapx], xOnRight);
+	drawNum(game->yCoords[game->y], game->xCoords[game->x], getV(game, swapy, swapx), xOnRight);
 
-	clearSpot(game->yCoords[swapy], game->xCoords[swapx], game->cells[swapy][swapx], swapXOnRight);
+	clearSpot(game->yCoords[swapy], game->xCoords[swapx], getV(game, swapy, swapx), swapXOnRight);
 	attron(A_BOLD);
 	drawNum(game->yCoords[swapy], game->xCoords[swapx], 0, swapXOnRight);
 	attroff(A_BOLD);
-	game->cells[game->y][game->x] = game->cells[swapy][swapx];
+	setV(game, game->y, game->x, getV(game, swapy, swapx));
 	
 	game->x = swapx;
 	game->y = swapy;
@@ -129,17 +129,17 @@ void cellsMap(GameVars *game, void (*f)(int, int, int, bool)) {
 	// iterate up to game->y row
 	for (int y = 0; y < game->y; y++) {
 		for (int x = 0; x < (game->cols + 1) / 2; x++) {
-			f(game->yCoords[y], game->xCoords[x], game->cells[y][x], false);
+			f(game->yCoords[y], game->xCoords[x], getV(game, y, x), false);
 		}
 		for (int x = (game->cols + 1) / 2; x < game->cols; x++) {
-			f(game->yCoords[y], game->xCoords[x], game->cells[y][x], true);
+			f(game->yCoords[y], game->xCoords[x], getV(game, y, x), true);
 		}
 	}
 
 	// iterate up to either halfway or game->x
 	int x = 0;
 	for (; x < game->x && x < (game->cols + 1) / 2; x++) {
-		f(game->yCoords[game->y], game->xCoords[x], game->cells[game->y][x], false);
+		f(game->yCoords[game->y], game->xCoords[x], getV(game, game->y, x), false);
 	}
 
 	// if stopped because reached game->x, iterate until halfway
@@ -148,26 +148,26 @@ void cellsMap(GameVars *game, void (*f)(int, int, int, bool)) {
 	if (x == game->x) {
 		x++;
 		for (; x < (game->cols + 1) / 2; x++) {
-			f(game->yCoords[game->y], game->xCoords[x], game->cells[game->y][x], false);
+			f(game->yCoords[game->y], game->xCoords[x], getV(game, game->y, x), false);
 		}
 	}
 	else {
 		for (; x < game->x; x++) {
-			f(game->yCoords[game->y], game->xCoords[x], game->cells[game->y][x], true);
+			f(game->yCoords[game->y], game->xCoords[x], getV(game, game->y, x), true);
 		}
 		x++;
 	}
 	for (; x < game->cols; x++) {
-		f(game->yCoords[game->y], game->xCoords[x], game->cells[game->y][x], true);
+		f(game->yCoords[game->y], game->xCoords[x], getV(game, game->y, x), true);
 	}
 
 	// iterate through the rest
 	for (int y = game->y + 1; y < game->rows; y++) {
 		for (int x = 0; x < (game->cols + 1) / 2; x++) {
-			f(game->yCoords[y], game->xCoords[x], game->cells[y][x], false);
+			f(game->yCoords[y], game->xCoords[x], getV(game, y, x), false);
 		}
 		for (int x = (game->cols + 1) / 2; x < game->cols; x++) {
-			f(game->yCoords[y], game->xCoords[x], game->cells[y][x], true);
+			f(game->yCoords[y], game->xCoords[x], getV(game, y, x), true);
 		}
 	}
 
@@ -204,11 +204,11 @@ void init(GameVars *game) {
 
 	// skip (0, 0) because that will be drawn by coordinate
 	for (int x = 1; x < game->cols; x++) {
-		game->cells[0][x] = x;
+		setV(game, 0, x, x);
 	}
 	for (int y = 1; y < game->rows; y++) {
 		for (int x = 0; x < game->cols; x++) {
-			game->cells[y][x] = y * game->cols + x;
+			setV(game, y, x, y * game->cols + x);
 		}
 	}
 

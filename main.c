@@ -91,12 +91,16 @@ int main(int argc, char *argv[]) {
 	}
 	
 	// game init
-	game.cells = malloc(game.rows * sizeof(int *));
-	for (int i = 0; i < game.rows; i++) {
-		game.cells[i] = malloc(game.cols * sizeof(int));
-	}
-	game.yCoords = malloc(game.rows * sizeof(int));
-	game.xCoords = malloc(game.cols * sizeof(int));
+	
+	int cells[game.rows * game.cols];
+	game.cells = cells;
+
+	int yCoords[game.rows];
+	game.yCoords = yCoords;
+
+	int xCoords[game.cols];
+	game.xCoords = xCoords;
+
 	game.y = game.x = 0;
 	game.undo = NULL;
 	init(&game);

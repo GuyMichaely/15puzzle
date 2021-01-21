@@ -2,7 +2,7 @@
 
 #include "undo.h"
 typedef struct GameVars {
-	int **cells;
+	int *cells;
 	int *yCoords;
 	int *xCoords;
 	int rows;
@@ -12,3 +12,11 @@ typedef struct GameVars {
 	Move *undo;
 	int* coordinates;
 } GameVars;
+
+int getV(GameVars *game, int y, int x) {
+	return game->cells[y * game->cols + x];
+}
+
+void setV(GameVars *game, int y, int x, int v) {
+	game->cells[y * game->cols + x] = v;
+}

@@ -11,7 +11,7 @@
 // returns whether or not chosen num is 0
 bool fillRand(GameVars *game, int nums[], const int i, const int length) {
 	const int choice = rand() % (length - i);
-	game->cells[i / game->cols][i % game->cols] = nums[choice];
+	setV(game, i/game->cols, i % game->cols, nums[choice]);
 	nums[choice] = nums[length - i - 1];
 	return choice == 0;
 }
@@ -63,7 +63,7 @@ void randomize(GameVars* game) {
 	int copy[length];
 	for (int i = 0; i < game->rows; i++) {
 		for (int j = 0; j < game->cols; j++) {
-			copy[i * game->cols + j] = game->cells[i][j];
+			copy[i * game->cols + j] = getV(game, i, j);
 		}
 	}
 
@@ -83,9 +83,14 @@ void randomize(GameVars* game) {
 	// board is not solvable if odd parity
 	// if so, swap 2 arbitrary non 0 cells
 	if (parity) {
-		game->cells[game->y][game->x] = game->cells[(game->y + 1) % game->rows][game->x]; // use 0 cell as temp
-		game->cells[(game->y + 1) % game->rows][game->x] = game->cells[(game->y + 1) % game->rows][(game->x + 1) % game->cols];
-		game->cells[(game->y + 1) % game->rows][(game->x + 1) % game->cols] = game->cells[game->y][game->x];
+		const int newY = (game->y + 1) % game->rows;
+		const int newX = (game->x + 1) % game->cols;
+		setV(game, game->y, game->x, getV(game, newY, game->x)); // use 0 cell as temp
+		setV(game, newY, game->x, getV(game, newY, newX));
+		setV(game, newY, newX, getV(game, game->y, game->x));
+		// game->cells[game->y][game->x] = game->cells[(game->y + 1) % game->rows][game->x]; // use 0 cell as temp
+		// game->cells[(game->y + 1) % game->rows][game->x] = game->cells[(game->y + 1) % game->rows][(game->x + 1) % game->cols];
+		// game->cells[(game->y + 1) % game->rows][(game->x + 1) % game->cols] = game->cells[game->y][game->x];
 	}
 
 	cellsMap(game, drawNum); // redraw all numbers
