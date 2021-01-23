@@ -202,14 +202,9 @@ void init(GameVars *game) {
 	raw();
 	keypad(stdscr, TRUE);	
 
-	// skip (0, 0) because that will be drawn by coordinate
-	for (int x = 1; x < game->cols; x++) {
-		setV(game, 0, x, x);
-	}
-	for (int y = 1; y < game->rows; y++) {
-		for (int x = 0; x < game->cols; x++) {
-			setV(game, y, x, y * game->cols + x);
-		}
+	// skip (0, 0) because that will be drawn manually
+	for (int i = 1; i < game->rows * game->cols; i++) {
+		game->cells[i] = i;
 	}
 
 	// init lines and cell coordinates
