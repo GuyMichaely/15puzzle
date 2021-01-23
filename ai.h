@@ -26,6 +26,7 @@ do { \
 	DOWN(); \
 	LEFT(); \
 } while (false)
+#define DOMOVES(moves) doMoves(game, swap, moves)
 
 #define MOVE_DELAY_MS -1
 
@@ -99,7 +100,6 @@ void getTransposedCoord(GameVars *game, int v, Coordinate *coord) {
 
 int *returnFirst(int *a, int *b){ return a; }
 int *returnSecond(int *a, int *b){ return b; }
-
 
 void realSwap(GameVars *game, int swapy, int swapx, char direction) {
 	// update coordinate of swapped cell
@@ -402,6 +402,16 @@ void positionFromTop(GameVars *game, Coordinate *a, GridTransforms *funcs) {
 	DOWN();
 }
 
+// void positionFromLeft(GameVars *game, Coordinate *a, GridTransforms *funcs) {
+//         interactiveDebug("fromLeft");
+//         int transx, transy;
+//         transy = game->y;
+//         transx = game->x;
+//         funcs->transformInts(&transx, &transy);
+//         const SwapFunction swap = funcs->swap;
+//
+// }
+
 // happens in 2 phases:
 // 	1. move 0 to the side of A it needs to be on
 // 	2. move A diagonally until it's either in the same row or column as B
@@ -497,7 +507,9 @@ void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, GridTransforms *func
 		// 3. k <= -1
 		// 	- position from right
 		// 	- (-2) * vertDistance - 1 cycles
-		// 	- 360
+		// 	- get to right of cell
+		// 		- 360 if moving to the right would mess up solved cells
+		//		- otherwise RIGHT(); UP(); LEFT();
 		// 	- (-1 - k) right shifts
 
 		const int k = a->y - b->y - (b->x - a->x);
@@ -523,18 +535,55 @@ void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, GridTransforms *func
 			positionFromRight(game, a, funcs);
 			interactiveDebug("-2 * vertDist - 1: %i", -2 * vertDist - 1);
 			upRight(game, swap, -2 * vertDist - 1);
-			DO360();
-			shiftRightU(game, swap, -1 - k);
+			
+			// when k < 0, the length of the box with corners *a and *b
+			// is greater than the height of the box
+			// the box also has a minimum height of 2
+			// therefore the smallest box for scenario k < 0 is a 2 x 3
+			// this is the only case where a 360 is neccesary to not mess up
+			// solved cells. therefore check if horDist > 3 to see if we need
+			// to 360
+			const int minWidth = 3;
+			if (horDist > minWidth) {
+				RIGHT();
+				UP();
+				LEFT();
+				shiftRightU(game, swap, -1 - k);
+			}
+			else {
+				DO360();
+			}
 		}
 	}
+}
+
+// performs a series of moves
+void doMoves(GameVars *game, SwapFunction swap, char *moves) {
+	do {
+		switch (*moves) {
+			case 'l':
+				LEFT();
+				break;
+			case 'd':
+				DOWN();
+				break;
+			case 'u':
+				UP();
+				break;
+			case 'r':
+				RIGHT();
+		}
+		moves++;
+	} while (*moves);
 }
 
 // solve a column/tranposed column of the grid
 // solve up to and including (col, row)
 // the solve direction is determined by corresponding functions passed in
 void funAiColumn(GameVars *game, GridTransforms *funcs, int row, int col) {
-	mvhline(1, 0, ' ', 255);
-	for (int *i = funcs->returnNth(&row, &col); *i > 1; (*i)--) {
+	// solve up to the top 2 cells in the column
+	int *cell; // either &row or &col depending on whether or not transposed
+	for (cell = funcs->returnNth(&row, &col); *cell > 1; (*cell)--) {
 		interactiveDebug("new cell");
 		Coordinate a;
 		funcs->getCoord(game, row * game->cols + col, &a);
@@ -545,6 +594,120 @@ void funAiColumn(GameVars *game, GridTransforms *funcs, int row, int col) {
 		moveAToB(game, &a, &b, funcs);
 		mvhline(1, 0, ' ', 255);
 	} 
+
+	// solve the last 2 cells in the column
+	// check if last 2 cells are already in position
+	Coordinate secondLast, last;
+	funcs->getCoord(game, row * game->cols + col, &secondLast);
+	(*cell)--;
+	funcs->getCoord(game, row * game->cols + col, &last);
+	
+	// last 2 cells are already correct
+	if (secondLast.y == 1 && secondLast.x == game->cols - 1 && last.y && last.x == game->cols - 1) {
+		return;
+	}
+		
+	// there are a bunch of special cases when the last 2 cells are not in position
+	// but are in the top right 2x2
+	const bool lastInside = last.y < 2 && last.x >= game->cols - 2;
+	const bool secondLastInside = secondLast.y < 2 && secondLast.x >= game->cols - 2;
+	if (lastInside && secondLastInside) {
+		// both are inside the 2x2 but not in position
+		// now deal with a bunch of special cases
+		// the solutions for the cases can be found with
+		// $ python effic.py
+
+		// 1 class of case for when 0 is in last col
+		// the other for second to last col
+		int transx = game->x;
+		int temp = game->y;
+		funcs->transformInts(&transx, &temp);
+
+		const SwapFunction swap = funcs->swap;
+		const int lastIndex = last.y * game->cols + last.x;
+		const int secondLastIndex = secondLast.y * game->cols + secondLast.x;
+		// coordinates relative to top right 2x2
+		const int zz = game->cols - 2; // (0, 0)
+		const int zo = zz + 1; // (0, 1)
+		const int oz = 2 * game->cols - 2; // (1, 0)
+		const int oo = oz + 1; // (1, 1)
+		if (transx == game->cols - 1) {
+			// 0 is in last col
+			if (lastIndex == zz) {
+				if (secondLastIndex == zo) {
+					DOMOVES("ul");
+				}
+				else {
+					DOMOVES("llurrdluldrrul");
+				}
+			}
+			else if (lastIndex == zo) {
+				if (secondLastIndex == zz) {
+					DOMOVES("llurdrulldrurdl");
+				}
+				else {
+					DOMOVES("l");
+				}
+			}
+			else {
+				if (secondLastIndex == zz) {
+					DOMOVES("lurdl");
+				}
+				else {
+					DOMOVES("ulldrurdllurdrul");
+				}
+			}
+		}
+		else {
+			// 0 is in second to last col
+			if (lastIndex == zz) {
+				if (secondLastIndex == zo) {
+					DOMOVES("lurrul");
+				}
+				else if (secondLastIndex == oz) {
+					DOMOVES("lururdllurrdl");
+				}
+				else {
+					DOMOVES("luurrdluldrrul");
+				}
+			}
+			else if (lastIndex == zo) {
+				if (secondLastIndex == zz) {
+					DOMOVES("luurdrulldrurdl");
+				}
+				else {
+					DOMOVES("lurruldlurrdl");
+				}
+			}
+			else if (lastIndex == oz) {
+				if (secondLastIndex == zz) {
+					DOMOVES("urulddluurdrul");
+				}
+				else if (lastIndex == zo) {
+					DOMOVES("luruldruldrrul");
+				}
+				else {
+					DOMOVES("lururdllurdrul");
+				}
+			}
+			else {
+				if (secondLastIndex == zz) {
+					DOMOVES("lurruldrul");
+				}
+				else if (secondLastIndex == zo) {
+					DOMOVES("uruldlurrdluldrrul");
+				}
+				else {
+					DOMOVES("luurrdl");
+				}
+			}
+		}
+		return;
+	}
+	
+	// not both are inside the 2x2
+	// we can move them normally
+	
 }
 
 void funAi(GameVars *game) {
