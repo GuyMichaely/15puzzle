@@ -4,3 +4,4 @@
 main
 test*
 !test.h
+*.txt

@@ -2,10 +2,9 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "undo.h"
 #include "drawing.h"
-#include "swap_ints.h"
 #include "game_vars.h"
+#include "test.h"
 
 // randomizes ith element of game->cells with element of nums
 // returns whether or not chosen num is 0
@@ -71,14 +70,19 @@ void randomize(GameVars* game) {
 	i = 0;
 	while (i < length) {
 		if (i != copy[i]) {
-			swapInts(copy + i, copy + copy[i]);
+			// swap copy[i] and copy[copy[i]]
+			const int temp = copy[i];
+			copy[i] = copy[copy[i]];
+			copy[temp] = temp;
+
 			parity = !parity; 
 		}   
 		else {
 			i++;
 		}   
 	}
-	parity = parity != ((game->x + game->y) % 2); // xor parity with the parity of manhattan distance of 0 to its goal position
+	const bool manhattanParity = (game->x + game->y) % 2;
+	parity = parity != manhattanParity; // xor parity with the parity of manhattan distance of 0 to its goal position
 
 	// board is not solvable if odd parity
 	// if so, swap 2 arbitrary non 0 cells
@@ -88,9 +92,6 @@ void randomize(GameVars* game) {
 		setV(game, game->y, game->x, getV(game, newY, game->x)); // use 0 cell as temp
 		setV(game, newY, game->x, getV(game, newY, newX));
 		setV(game, newY, newX, getV(game, game->y, game->x));
-		// game->cells[game->y][game->x] = game->cells[(game->y + 1) % game->rows][game->x]; // use 0 cell as temp
-		// game->cells[(game->y + 1) % game->rows][game->x] = game->cells[(game->y + 1) % game->rows][(game->x + 1) % game->cols];
-		// game->cells[(game->y + 1) % game->rows][(game->x + 1) % game->cols] = game->cells[game->y][game->x];
 	}
 
 	cellsMap(game, drawNum); // redraw all numbers
