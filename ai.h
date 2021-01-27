@@ -165,7 +165,6 @@ void transposedSwap(GameVars *game, int swapy, int swapx, char direction) {
 }
 
 void negSwap(GameVars *game, int swapy, int swapx, char direction) {
-	interactiveDebug("negSwap asked to move %i, %i; realSwap %i, %i", swapy, swapx, -swapy, swapx);
 	switch (direction) {
 		case 'u':
 			direction = 'd';
@@ -310,12 +309,7 @@ void moveUpFor(GameVars *game, SwapFunction swap, int n) {
 // move 0 directly to the right of *a without
 // without moving in to *a
 // then move to the left in order to swap places with *a
-//
-// TODO: need to do something different for moving 
-// second to last cell in to position
-// to deal with case where second to last cell is 1 column left
-// of its preposition
-void positionFromRight(GameVars *game, Coordinate *a, GridTransforms *funcs) {
+void positionFromRight(GameVars *game, Coordinate *a, int doneCol, GridTransforms *funcs) {
 	interactiveDebug("fromRight");
 	int transx, transy;
 	transy = game->y;
@@ -351,6 +345,14 @@ void positionFromRight(GameVars *game, Coordinate *a, GridTransforms *funcs) {
 	// 0 is not in the same row as *a
 
 	// ensure 0 is to the right of *a
+	if (doneCol == a->x + 1 &&  a->y < transy) {
+		if (transx == a->x) {
+			LEFT();
+			transx--;
+		}
+		moveUpFor(game, swap, transy - (a->y - 1));
+		transy = a->y - 1;
+	}
 	moveRightFor(game, swap, a->x + 1 - transx);
 
 	// ensure 0 is in the column directly to the right of *a
@@ -361,6 +363,38 @@ void positionFromRight(GameVars *game, Coordinate *a, GridTransforms *funcs) {
 	moveDownFor(game, swap, a->y - transy);
 
 	LEFT();
+}
+
+// special case when moving second to last cell
+// in to pre-position
+void positionFromRightSpecial(GameVars *game, Coordinate *a, int doneCol, GridTransforms *funcs) {
+	// special case where second to last cell is 1 to the left of its pre position
+	// this single special case is the only reason this function exists
+	if (a->y == 0 && a->x == doneCol - 1) {
+		int transx, transy;
+		transy = game->y;
+		transx = game->x;
+		funcs->transformInts(game, &transy, &transx);
+		const SwapFunction swap = funcs->swap;
+
+		if (transy == a->y) {
+			if (transx == a->x + 1) {
+				LEFT();
+				return;
+			}
+			DOWN();
+			transy++;
+		}
+		// 0 is below *a
+
+		moveUpFor(game, swap, transy - 1);
+		moveRightFor(game, swap, doneCol - transx);
+		UP();
+		LEFT();
+	}
+	else {
+		positionFromRight(game, a, doneCol, funcs);
+	}
 }
 
 // move 0 directly below *a without moving in to *a
@@ -476,13 +510,12 @@ void positionFromTop(GameVars *game, Coordinate *a, GridTransforms *funcs) {
 // 	1. move 0 to the side of A it needs to be on
 // 	2. move A diagonally until it's either in the same row or column as B
 // 	3. Move A in a horizontal/vertical line to B if neccesary
-void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, GridTransforms *funcs) {
+void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, int doneCol, GridTransforms *funcs) {
 	const int vertDist = b->y - a->y;
 	const int horDist = b->x - a->x;
 	if (!vertDist && !horDist) {
 		return;
 	}
-
 
 	int transx = game->x;
 	int transy = game->y;
@@ -491,7 +524,7 @@ void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, GridTransforms *func
 	interactiveDebug("vertDist: %i", vertDist);
 	if (vertDist >= 0) { // a* is above b*
 		if (horDist > vertDist) { // more distance horizontally than vertically
-			positionFromRight(game, a, funcs);
+			positionFromRight(game, a, doneCol, funcs);
 			if (vertDist) {
 				interactiveDebug("down right up");
 				DOWN();
@@ -501,7 +534,6 @@ void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, GridTransforms *func
 			downRight(game, swap, 2 * vertDist - 1);
 			const int alreadyTraveled = 1 + vertDist; // positionFromRight moves it over by 1
 			 					  // then downRight moves it over by vertDist
-								 
 			shiftRightU(game, swap, b->x - a->x - alreadyTraveled);
 		}
 		else if (horDist < vertDist) { // more distance vertically than horizontally
@@ -537,7 +569,7 @@ void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, GridTransforms *func
 		// otherwise positionFromBottom because it is either correct or irrelevant
 		else if ((a->x <= transx) && (a->y >= transy)) {
 			// interactiveDebug("a->x <= game->x: %i, a->y >= game->y: %i", a->x <= game->x, a->y >= game->y)
-			positionFromRight(game, a, funcs);
+			positionFromRight(game, a, doneCol, funcs);
 			interactiveDebug("down right up");
 			DOWN();
 			RIGHT();
@@ -596,7 +628,7 @@ void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, GridTransforms *func
 			DO360();
 		}
 		else {
-			positionFromRight(game, a, funcs);
+			positionFromRight(game, a, doneCol, funcs);
 			interactiveDebug("wtf-2 * vertDist - 1: %i", -2 * vertDist - 1);
 			upRight(game, swap, -2 * vertDist - 1);
 			
@@ -646,10 +678,10 @@ void doMoves(GameVars *game, SwapFunction swap, char *moves) {
 // the solve direction is determined by corresponding functions passed in
 void funAiColumn(GameVars *game, GridTransforms *funcs, int row, int col) {
 	// solve up to the top 2 cells in the column
-	int *cellRow; // either &row or &col depending on whether or not transposed;
-	// &col for tranposed
+	int *cellRow = funcs->returnNth(&row, &col);
+	const int transcol = *funcs->returnNth(&col, &row);
 	
-	for (cellRow = funcs->returnNth(&row, &col); *cellRow > 1; (*cellRow)--) {
+	for (; *cellRow > 1; (*cellRow)--) {
 		interactiveDebug("new cellRow");
 		Coordinate a;
 		funcs->getCoord(game, row * game->cols + col, &a);
@@ -657,7 +689,7 @@ void funAiColumn(GameVars *game, GridTransforms *funcs, int row, int col) {
 		Coordinate b = {row, col};
 		funcs->transformInts(game, &b.y, &b.x);
 		interactiveDebug("(b->y, b->x): (%i, %i)", b.y, b.x);
-		moveAToB(game, &a, &b, funcs);
+		moveAToB(game, &a, &b, transcol, funcs);
 		mvhline(1, 0, ' ', 255);
 	} 
 
@@ -668,9 +700,6 @@ void funAiColumn(GameVars *game, GridTransforms *funcs, int row, int col) {
 	interactiveDebug("secondLast.y, secondLast.x: %i, %i", secondLast.y, secondLast.x);
 	(*cellRow)--;
 	funcs->getCoord(game, col, &last);
-
-	const int transcol = *funcs->returnNth(&col, &row);
-	interactiveDebug("transcol: %i", transcol);
 
 	const bool lastCorrect = last.y && (last.x == transcol);
 	const bool secondLastCorrect = (secondLast.y == 1) && (secondLast.x == transcol);
@@ -841,7 +870,7 @@ void funAiColumn(GameVars *game, GridTransforms *funcs, int row, int col) {
 			// 3. dllupdrul
 			if (vertness == -1) {
 				if (secondLast.y > 1) {
-					positionFromRight(game, &secondLast, funcs);
+					positionFromRight(game, &secondLast, transcol, funcs);
 					upRight(game, swap, 2 * (secondLast.y - 1) - 1);
 
 					// position 0 to right of correct position
@@ -866,7 +895,7 @@ void funAiColumn(GameVars *game, GridTransforms *funcs, int row, int col) {
 				DOMOVES("rdllurdrul");
 			}
 			else {
-				positionFromRight(game, &secondLast, funcs);
+				positionFromRight(game, &secondLast, transcol, funcs);
 				upRight(game, swap, diagCycles - 1);
 
 				interactiveDebug("wouldStuck vertness < -1");
@@ -890,8 +919,7 @@ void funAiColumn(GameVars *game, GridTransforms *funcs, int row, int col) {
 			}
 		}
 		else {
-			// look how easy life could be if there weren't special cases
-			positionFromRight(game, &secondLast, funcs);
+			positionFromRightSpecial(game, &secondLast, transcol, funcs);
 			upRight(game, swap, diagCycles);
 			shiftRightD(game, swap, horDist - 1 - secondLast.y);
 		}
@@ -927,7 +955,7 @@ void funAiColumn(GameVars *game, GridTransforms *funcs, int row, int col) {
 	negTransform(game, &last.y, &last.x);
 	interactiveDebug("*cellRow: %i, transcol: %i, finalPos.y: %i, finalPos.x: %i", *cellRow, transcol, finalPos.y, finalPos.x);
 	interactiveDebug("moving (transformed) (%i, %i) to (%i, %i)", last.y, last.x, finalPos.y, finalPos.x);
-	moveAToB(game, &last, &finalPos, funcs);
+	moveAToB(game, &last, &finalPos, transcol, funcs);
 
 	// both in pre-position; make the final rotation
 	interactiveDebug("final rotation");
