@@ -1,0 +1,145 @@
+a=0 b=1
+ 5| a| b
+---------
+ 4| 3| 2
+---------
+ 5| 4|   
+
+a=0 b=2
+11| a|  
+---------
+11| b|14
+---------
+12|13|   
+
+a=0 b=3
+11| a|  
+---------
+12|13| b
+---------
+13|14|   
+
+a=1 b=0
+12| b| a
+---------
+13|14|15
+---------
+14|15|   
+
+a=1 b=2
+12|13| a
+---------
+11| b| 1
+---------
+12|13|   
+
+a=2 b=0
+12| b|  
+---------
+12| a| 5
+---------
+13|14|   
+
+a=2 b=1
+ 5| 4| b
+---------
+ 6| a|16
+---------
+ 7| 8|   
+
+a=2 b=3
+13|14|15
+---------
+12| a| b
+---------
+13|14|   
+
+a=3 b=0
+ 6| b|  
+---------
+ 5| 4| a
+---------
+ 6| 5|   
+
+a=3 b=1
+18|17| b
+---------
+18|17| a
+---------
+19|18|   
+
+a=3 b=2
+ 4| 3| 2
+---------
+ 5| b| a
+---------
+ 6| 7|   
+
+(0, 1, 0) drrul
+(0, 1, 3) rrul
+(0, 1, 4) rul
+(0, 1, 5) ul
+(0, 1, 6) urrul
+(0, 1, 7) urul
+(0, 2, 0) rdrulldrrul
+(0, 2, 3) rurdllurrdl
+(0, 2, 5) llurrdluldrrul
+(0, 2, 6) ururdllurrdl
+(0, 2, 7) uurdldluurrdl
+(0, 3, 0) rrdluldrrul
+(0, 3, 3) urrdluldrrul
+(0, 3, 4) lurrdluldrrul
+(0, 3, 6) uurrdluldrrul
+(0, 3, 7) ulurrdluldrrul
+(1, 0, 0) rdrulldrurdl
+(1, 0, 3) urdrulldrurdl
+(1, 0, 4) uldrruldlurrdl
+(1, 0, 5) llurdrulldrurdl
+(1, 0, 6) uurdrulldrurdl
+(1, 0, 7) ulurdrulldrurdl
+(1, 2, 0) drruldlurrdl
+(1, 2, 1) ldrruldlurrdl
+(1, 2, 3) rruldlurrdl
+(1, 2, 5) l
+(1, 2, 6) urruldlurrdl
+(1, 2, 7) urulddluurrdl
+(1, 3, 0) 
+(1, 3, 1) 
+(1, 3, 3) 
+(1, 3, 4) 
+(1, 3, 6) 
+(1, 3, 7) 
+(2, 0, 0) rrdluldrurdl
+(2, 0, 3) rruldlurdrul
+(2, 0, 5) lurdl
+(2, 0, 6) urruldlurdrul
+(2, 0, 7) urulddluurdrul
+(2, 1, 0) rdrul
+(2, 1, 1) drul
+(2, 1, 3) urdrul
+(2, 1, 5) ulldrurdllurdrul
+(2, 1, 6) uurdrul
+(2, 1, 7) luurdrul
+(2, 3, 0) drurdllurdrul
+(2, 3, 1) ldrurdllurdrul
+(2, 3, 2) lldrurdllurdrul
+(2, 3, 3) rurdllurdrul
+(2, 3, 6) ururdllurdrul
+(2, 3, 7) uurdldluurdrul
+(3, 0, 0) drurdl
+(3, 0, 3) rurdl
+(3, 0, 4) urdl
+(3, 0, 6) ururdl
+(3, 0, 7) uurdl
+(3, 1, 0) rrdllurdrulldrurdl
+(3, 1, 1) rdllurdrulldrurdl
+(3, 1, 3) rrulldrurdllurdrul
+(3, 1, 4)   
+(3, 1, 6) urrulldrurdllurdrul
+(3, 1, 7) urulldrurdllurdrul
+(3, 2, 0) rrdl
+(3, 2, 1) rdl
+(3, 2, 2) dl
+(3, 2, 3) urrdl
+(3, 2, 6) uurrdl
+(3, 2, 7) luurrdl
