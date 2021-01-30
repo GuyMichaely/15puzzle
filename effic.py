@@ -86,34 +86,44 @@ def isTrap(a, b):
 def isImpossible(a, b, z):
   return z == 2 and (isTrap(a, b) or isTrap(b, a))
 
+def doConfig(log, a, b):
+  # will hold move distances for an AB configuration
+  data = [[None, None, None], [None, None, None], [None, None, None]]
+  data[a // 3][a % 3] = 'a'
+  data[b // 3][b % 3] = 'b'
+  aDisplay = (a + 1 - a // 3) % 2 + 2 * (a // 3)
+  bDisplay = (b + 1 - b // 3) % 2 + 2 * (b // 3)
+  for z in range(8):
+    if z == a or z == b:
+      continue
+    if isImpossible(a, b, z):
+      continue
+    result = getMoves(a, b, bounds3, z, [-3, -1, 1, 3])
+    log[(aDisplay, bDisplay, z)] = ''.join(charmap[i] for i in result[2])
+    data[z // 3][z % 3] = len(result[2])
+  print(f'a={aDisplay} b={bDisplay}')
+  print(
+    '\n---------\n'.join(
+      '|'.join(
+        '  ' if e is None else '%2s' % str(e) for e in row
+      ) for row in data
+    ), 
+    '\n'
+  )
+
 log = {} # store move lists
 for a in [1, 2, 4, 5]:
   for b in [1, 2, 4, 5]:
     if a == b:
       continue
-    # will hold move distances for an AB configuration
-    data = [[None, None, None], [None, None, None], [None, None, None]]
-    data[a // 3][a % 3] = 'a'
-    data[b // 3][b % 3] = 'b'
+    if a == 2 and b == 5:
+      continue
+    doConfig(log, a, b)
+for key in log:
+  print(key, log[key])
 
-    for z in range(8):
-      if z == a or z == b:
-        continue
-      if isImpossible(a, b, z):
-        continue
-      result = getMoves(a, b, bounds3, z, [-3, -1, 1, 3])
-      aDisplay = (a + 1 - a // 3) % 2 + 2 * (a // 3)
-      bDisplay = (b + 1 - b // 3) % 2 + 2 * (b // 3)
-      log[(aDisplay, bDisplay, z)] = ''.join(charmap[i] for i in result[2])
-      data[z // 3][z % 3] = len(result[2])
-    print(f'a={aDisplay} b={bDisplay}')
-    print(
-      '\n---------\n'.join(
-        '|'.join(
-          '  ' if e is None else '%2s' % str(e) for e in row
-        ) for row in data
-      ), 
-      '\n'
-    )
+log = {}
+doConfig(log, 2, 3)
+doConfig(log, 2, 6)
 for key in log:
   print(key, log[key])

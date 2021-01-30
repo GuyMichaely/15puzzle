@@ -26,7 +26,7 @@ do { \
 } while (false)
 #define DOMOVES(moves) doMoves(game, swap, moves)
 
-#define MOVE_DELAY_MS -1
+#define MOVE_DELAY_MS 0
 
 typedef struct Coordinate{
 	int y;
@@ -216,6 +216,9 @@ void upRight(GameVars *game, SwapFunction swap, int n) {
 			UP();
 			LEFT();
 		}
+		else {
+			return;
+		}
 	}
 }
 
@@ -230,6 +233,9 @@ void downRight(GameVars *game, SwapFunction swap, int n) {
 			DOWN();
 			RIGHT();
 			UP();
+		}
+		else {
+			return;
 		}
 	}
 }
@@ -291,6 +297,11 @@ void moveRightFor(GameVars *game, SwapFunction swap, int n) {
 	}
 }
 
+void moveRightLeft(GameVars *game, SwapFunction swap, int n) {
+	moveRightFor(game, swap, n);
+	moveLeftFor(game, swap, -n);
+}
+
 void moveDownFor(GameVars *game, SwapFunction swap, int n) {
 	while (n-- > 0) {
 		DOWN();
@@ -301,6 +312,11 @@ void moveUpFor(GameVars *game, SwapFunction swap, int n) {
 	while (n-- > 0) {
 		UP();
 	}
+}
+
+void moveUpDown(GameVars *game, SwapFunction swap, int n) {
+	moveUpFor(game, swap, n);
+	moveDownFor(game, swap, -n);
 }
 
 // all the positionFrom functions assume at least a 3x3 board
@@ -522,7 +538,7 @@ void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, int doneCol, GridTra
 	funcs->transformInts(game, &transy, &transx);
 	const SwapFunction swap = funcs->swap;
 	interactiveDebug("vertDist: %i", vertDist);
-	if (vertDist >= 0) { // a* is above b*
+	if (vertDist >= 0) { // a* is aboveor level with  b*
 		if (horDist > vertDist) { // more distance horizontally than vertically
 			positionFromRight(game, a, doneCol, funcs);
 			if (vertDist) {
@@ -635,19 +651,19 @@ void moveAToB(GameVars *game, Coordinate *a, Coordinate *b, int doneCol, GridTra
 			// when vertness < 0, the length of the box with corners *a and *b
 			// is greater than the height of the box
 			// the box also has a minimum height of 2
-			// therefore the smallest box for scenario vertness < 0 is a 2 x 3
+			// therefore the smallest box for scenario vertness < 0 is a 2 x 3 (width 2)
 			// this is the only case where a 360 is neccesary to not mess up
-			// solved cells. therefore check if horDist > 3 to see if we need
+			// solved cells. therefore check if horDist == 2 to see if we need
 			// to 360
-			const int minWidth = 3;
-			if (horDist > minWidth) {
+			const int minWidth = 2;
+			if (horDist == minWidth) {
+				DO360();
+			}
+			else {
 				RIGHT();
 				UP();
 				LEFT();
 				shiftRightU(game, swap, -1 - vertness);
-			}
-			else {
-				DO360();
 			}
 		}
 	}
@@ -671,6 +687,134 @@ void doMoves(GameVars *game, SwapFunction swap, char *moves) {
 		}
 		moves++;
 	} while (*moves);
+}
+
+bool secondLastToPrePos(GameVars *game, Coordinate *secondLast, Coordinate *last, int transcol, GridTransforms *funcs) {
+	int horDist = transcol - secondLast->x;
+	int vertness = secondLast->y - horDist;
+	const SwapFunction swap = funcs->swap;
+	// vertness >= 0:
+	//	* positionFromTop
+	//	* 2 * (b->x - a->x) cycle
+	// 	* vertness upshifts
+	// 	* RIGHT(); UP(); LEFT();
+	// else:
+	// 	* positionFromRight
+	// 	* 2 * (a->y - b->y) cycles
+	// 	* -vertness - 1 rightshifts
+	int transx = game->x;
+	int transy = game->y;
+	funcs->transformInts(game, &transy, &transx);
+	if (vertness > 0) {
+		const bool secondLastInOneZero = secondLast->y == 1 && horDist == 1;
+		const bool zeroInOneOne = transy == 1 && transx == transcol;
+		if (secondLastInOneZero && zeroInOneOne) {
+			/* special case:
+			 * XA
+			 * B0
+			 * X can be anything, A is goal position, B is initial position, 0 is 0
+			 * In this case do LEFT(); UP(); RIGHT(); DOWN();
+			 */
+			LEFT();
+			UP();
+			RIGHT();
+			DOWN();
+		}
+		else {
+			positionFromTop(game, secondLast, funcs);
+			if (horDist) {
+				if (horDist > 1) {
+					RIGHT();
+					UP();
+					LEFT();
+				}
+				upRight(game, swap, 2 * (horDist - 1) - 1);
+				shiftUp(game, swap, secondLast->y - horDist);
+				RIGHT();
+				UP();
+				LEFT();
+			}
+		}
+	}
+	else {
+		// special case
+		// if last is in its correct position and secondLast is not
+		// when we try to move in secondLast we will get last stuck
+		const int diagCycles = 2 * secondLast->y;
+		const bool wouldStuck = last->y == 0 && last->x == transcol;
+		if (wouldStuck) {
+			// special cases: vertness == 0 and vertness == -1
+			if (vertness > -2) {
+				// special case: 3x3 and 0 is in right mid
+				// is shorter than what we'd do otherwise
+				if (vertness == 0 && horDist == 2 && transy == 1 && transx == transcol) {
+					DOMOVES("ullddrulurrdl");
+					return true;
+				}
+				else if (vertness == 0) {
+					// look at the last 2 grids in effics.txt
+					// look at the relationships of the move distances
+					// and compare them between the 2 grids; notice the similarity?
+					// (1, 3) is the same as (1, 5) when you move 0 down in to b
+					positionFromTop(game, secondLast, funcs);
+					transy = secondLast->y;
+					transx = secondLast->x;
+					secondLast->y--;
+				}
+				
+				if (horDist > 2) {
+					positionFromRight(game, secondLast, transcol, funcs);
+					upRight(game, swap, 2 * (horDist - 2) - 1);
+					RIGHT();
+					UP();
+				}
+				else {
+					moveRightFor(game, swap, transcol - 1 - transx);
+					moveUpFor(game, swap, transy - 1);
+				}
+				DOMOVES("ruldlurrdl");
+			}
+			else {
+				positionFromRight(game, secondLast, transcol, funcs);
+				upRight(game, swap, diagCycles - 1);
+
+				interactiveDebug("wouldStuck vertness < -1");
+				// if we get any close than 2 without
+				// preparation we'll get stuck so - 2
+				// (horDist - 1) bc positionFromRight
+				// moved it over 1
+				const int shiftDist = (horDist - 1) - 2; 
+				interactiveDebug("shiftright %i times", shiftDist);
+				// shiftRightD
+				// shift right, moving down to go around
+				for (int i = 0; i < shiftDist; i++) {
+					RIGHT();
+					UP();
+					LEFT();
+					DOWN();
+					RIGHT();
+					RIGHT();
+				}
+
+				interactiveDebug("choreographed rrulldrrul");
+				DOMOVES("rrulldrrul");
+			}
+			return true;
+		}
+		else if (vertness == 0) {
+			positionFromTop(game, secondLast, funcs);
+			RIGHT();
+			UP();
+			LEFT();
+			upRight(game, swap, 2 * (horDist - 1));
+		}
+		else {
+			positionFromRightSpecial(game, secondLast, transcol, funcs);
+			upRight(game, swap, diagCycles);
+			shiftRightD(game, swap, horDist - 1 - secondLast->y);
+		}
+	}
+	return false;
 }
 
 // solve a column/tranposed column of the grid
@@ -699,9 +843,9 @@ void funAiColumn(GameVars *game, GridTransforms *funcs, int row, int col) {
 	funcs->getCoord(game, game->cols * row + col, &secondLast);
 	interactiveDebug("secondLast.y, secondLast.x: %i, %i", secondLast.y, secondLast.x);
 	(*cellRow)--;
-	funcs->getCoord(game, col, &last);
+	funcs->getCoord(game, game->cols * row + col, &last);
 
-	const bool lastCorrect = last.y && (last.x == transcol);
+	const bool lastCorrect = !last.y && (last.x == transcol);
 	const bool secondLastCorrect = (secondLast.y == 1) && (secondLast.x == transcol);
 	if (lastCorrect && secondLastCorrect) {
 		return;
@@ -717,245 +861,167 @@ void funAiColumn(GameVars *game, GridTransforms *funcs, int row, int col) {
 	const bool lastInside = (last.y < 2) && (last.x >= transcol - 1);
 	const bool secondLastInside = (secondLast.y < 2) && (secondLast.x >= transcol - 1);
 	if (lastInside && secondLastInside) {
-		interactiveDebug("special cases");
 		// both are inside the 2x2 but not in position
-		// now deal with a bunch of special cases
-		// the solutions for the cases can be found with
-		// $ python effic.py
+		// I brute forced all special cases (effic.py)
+		// will now handle each special case with those results
 
-		// 1 class of case for when 0 is in last col
-		// the other for second to last col
-		int transx = game->x;
-		int temp = game->y;
-		funcs->transformInts(game, &temp, &transx);
+		// convert coordinates to indices in 2x2
+		// 0 = top left,    1 = top right,
+		// 2 = bottom left, 3 = bottom right
+		last.x -= transcol - 1;
+		const int lastIndex = 2 * last.y + last.x;
+		secondLast.x -= transcol - 1;
+		const int secondLastIndex = 2 * secondLast.y + secondLast.x;
 
-		const int lastIndex = last.y * game->cols + last.x;
-		const int secondLastIndex = secondLast.y * game->cols + secondLast.x;
-		// coordinates relative to top right 2x2
-		const int zz = transcol - 1; // (0, 0)
-		const int zo = zz + 1; // (0, 1)
-		const int oz = zz + game->cols; // (1, 0)
-		const int oo = oz + 1; // (1, 1)
-		if (transx == transcol) {
-			// 0 is in last col
-			if (lastIndex == zz) {
-				if (secondLastIndex == zo) {
-					DOMOVES("ul");
-				}
-				else {
-					DOMOVES("llurrdluldrrul");
-				}
-			}
-			else if (lastIndex == zo) {
-				if (secondLastIndex == zz) {
-					DOMOVES("llurdrulldrurdl");
-				}
-				else {
-					DOMOVES("l");
-				}
+		if (lastIndex == 0 && secondLastIndex == 1) {
+			// get 0 to 2nd row
+			moveDownFor(game, swap, transy - 1);
+			moveUpFor(game, swap, 1 - transy);
+			// rightmost cell
+			moveRightFor(game, swap, transcol - 1);
+			// finish
+			UP();
+			LEFT();
+		}
+		else if (lastIndex == 0 && secondLastIndex == 2) {
+			if (transx == transcol) {
+				DOMOVES("llurrdluldrrul");
 			}
 			else {
-				if (secondLastIndex == zz) {
-					DOMOVES("lurdl");
+				// get 0 to the correct column
+				moveRightLeft(game, swap, (transcol - 2) - transx);
+				// get 0 within the first 2 rows
+				moveUpFor(game, swap, transy - 1);
+				if (transy == 0) {
+					DOMOVES("rdrulldrrul");
 				}
 				else {
-					DOMOVES("ulldrurdllurdrul");
+					DOMOVES("rurdllurrdl");
 				}
 			}
 		}
-		else {
-			// 0 is in second to last col
-			if (lastIndex == zz) {
-				if (secondLastIndex == zo) {
-					DOMOVES("lurrul");
-				}
-				else if (secondLastIndex == oz) {
-					DOMOVES("lururdllurrdl");
-				}
-				else {
-					DOMOVES("luurrdluldrrul");
-				}
-			}
-			else if (lastIndex == zo) {
-				if (secondLastIndex == zz) {
-					DOMOVES("luurdrulldrurdl");
-				}
-				else {
-					DOMOVES("lurruldlurrdl");
-				}
-			}
-			else if (lastIndex == oz) {
-				if (secondLastIndex == zz) {
-					DOMOVES("urulddluurdrul");
-				}
-				else if (lastIndex == zo) {
-					DOMOVES("luruldruldrrul");
-				}
-				else {
-					DOMOVES("lururdllurdrul");
-				}
+		else if (lastIndex == 0 && secondLastIndex == 3) {
+			moveRightLeft(game, swap, transcol - 2 - transx);
+			moveUpFor(game, swap, transy);
+			DOMOVES("rrdluldrrul");
+		}
+		else if (lastIndex == 1 && secondLastIndex == 0) {
+			moveRightLeft(game, swap, transcol - 2 - transx);
+			moveUpFor(game, swap, transy);
+			DOMOVES("rdrulldrurdl");
+		}
+		else if (lastIndex == 1 && secondLastIndex == 2) {
+			if (transx == transcol) {
+				LEFT();
 			}
 			else {
-				if (secondLastIndex == zz) {
-					DOMOVES("lurruldrul");
-				}
-				else if (secondLastIndex == zo) {
-					DOMOVES("uruldlurrdluldrrul");
+				moveRightLeft(game, swap, transcol - 2 - transx);
+				moveUpDown(game, swap, transy - 1);
+				DOMOVES("rruldlurrdl");
+			}
+		}
+		else if (lastIndex == 2 && secondLastIndex == 0) {
+			if (transx == transcol) {
+				DOMOVES("lurdl");
+			}
+			else {
+				moveRightLeft(game, swap, transcol - 2 - transx);
+				moveUpFor(game, swap, transy - 1);
+				if (transy == 0) {
+					DOMOVES("rrdluldrurdl");
 				}
 				else {
-					DOMOVES("luurrdl");
+					DOMOVES("rruldlurdrul");
 				}
 			}
 		}
+		else if (lastIndex == 2 && secondLastIndex == 1) {
+			if (transx == transcol) {
+				DOMOVES("ulldrurdllurdrul");
+			}
+			else {
+				if (!(transy == 0 && transx == transcol - 1)) {
+					moveRightLeft(game, swap, transcol - 2 - transx);
+					moveUpFor(game, swap, transy);
+					RIGHT();
+				}
+				DOMOVES("drul");
+			}
+		}
+		else if (lastIndex == 2 && secondLastIndex == 3) {
+			moveRightLeft(game, swap, transcol - 2 - transx);
+			moveUpDown(game, swap, transy);
+			DOMOVES("rurdllurdrul");
+		}
+		else if (lastIndex == 3 && secondLastIndex == 0) {
+			moveUpDown(game, swap, transy - 1);
+			moveRightFor(game, swap, transcol - 1 - transx);
+			DOMOVES("urdl");
+		}
+		else if (lastIndex == 3 && secondLastIndex == 1) {
+			moveRightFor(game, swap, transcol - 1 - transx);
+			moveUpFor(game, swap, transy - 1);
+			if (transy == 0) {
+				DOMOVES("rdllurdrulldrurdl");
+			}
+			else {
+				DOMOVES("rulldrurdllurdrul");
+			}
+		}
+		else { // lastIndex == 3 && secondLastIndex == 2
+			if (transy) {
+				moveRightLeft(game, swap, transcol - 2 - transx);
+				moveUpFor(game, swap, transy);
+				moveRightFor(game, swap, 2);
+			}
+			else {
+				moveRightFor(game, swap, transcol - transx);
+			}
+			DOWN();
+			LEFT();
+		} 
 		return;
 	}
 
 	// not both are inside the 2x2
 	// we can move them normally
-	int horDist = transcol - secondLast.x;
-	int vertness = secondLast.y - horDist;
-	interactiveDebug("horDist: %i, vertness: %i", horDist, vertness);
-	// vertness >= 0:
-	//	* positionFromTop
-	//	* 2 * (b->x - a->x) cycle
-	// 	* vertness upshifts
-	// 	* RIGHT(); UP(); LEFT();
-	// else:
-	// 	* positionFromRight
-	// 	* 2 * (a->y - b->y) cycles
-	// 	* -vertness - 1 rightshifts
-	if (vertness >= 0) {
-		const bool secondLastInOneZero = secondLast.y == 1 && horDist == 1;
-		const bool zeroInOneOne = last.y == 1 && last.x == transcol;
-		if (secondLastInOneZero && zeroInOneOne) {
-			/* special case:
-			 * XA
-			 * B0
-			 * X can be anything, A is goal position, B is initial position 0 is 0
-			 * In this case do LEFT(); UP(); RIGHT(); DOWN();
-			 */
-			LEFT();
-			UP();
-			RIGHT();
-			DOWN();
-		}
-		else {
-			positionFromTop(game, &secondLast, funcs);
-			RIGHT();
-			UP();
-			LEFT();
-			const bool wouldIntersect = vertness; // would intersect with solve cells
-			if (wouldIntersect) {
-				upRight(game, swap, 2 * (horDist - 1) - 1);
-				shiftUp(game, swap, vertness);
-				RIGHT();
-				UP();
-				LEFT();
-			}
-			else {
-				upRight(game, swap, 2 * (horDist - 1));
-			}
-		}
+	const bool needMoveSecondLast = !(secondLast.x == transcol && secondLast.y == 0);
+	if (needMoveSecondLast && secondLastToPrePos(game, &secondLast, &last, transcol, funcs)) {
+		return;
 	}
-	else {
-		// special case
-		// if last is in its correct position and secondLast is not
-		// when we try to move in secondLast we will get last stuck
-		const int diagCycles = 2 * secondLast.y;
-		const bool wouldStuck = last.y == 0 && last.x == transcol;
-		if (wouldStuck) {
-			// special case: vertness == -1
-			// 1. move last so it's 2 to the left and 1 below its correct position
-			// 2. move in to the last position from the right
-			// 3. dllupdrul
-			if (vertness == -1) {
-				if (secondLast.y > 1) {
-					positionFromRight(game, &secondLast, transcol, funcs);
-					upRight(game, swap, 2 * (secondLast.y - 1) - 1);
-
-					// position 0 to right of correct position
-					RIGHT();
-					UP();
-					UP();
-				}
-				else {
-					// move 0 to the right of correct position
-					// without running over secondLast
-					if (transx == secondLast.x) {
-						RIGHT();
-						moveUpFor(game, swap, transy);
-					}
-					else {
-						moveUpFor(game, swap, transy);
-						moveRightFor(game, swap, transx);
-					}
-				}
-
-				// 0 is now in position
-				DOMOVES("rdllurdrul");
-			}
-			else {
-				positionFromRight(game, &secondLast, transcol, funcs);
-				upRight(game, swap, diagCycles - 1);
-
-				interactiveDebug("wouldStuck vertness < -1");
-				// if we get any close than 2 without
-				// preparation we'll get stuck so - 2
-				// (horDist - 1) bc positionFromRight
-				// moved it over 1
-				const int shiftDist = (horDist - 1) - 2; 
-				interactiveDebug("modified shiftright %i times", shiftDist);
-				for (int i = 0; i < shiftDist; i++) {
-					RIGHT();
-					UP();
-					LEFT();
-					DOWN();
-					RIGHT();
-					RIGHT();
-				}
-
-				interactiveDebug("choreographed rrulldrrul");
-				DOMOVES("rrulldrrul");
-			}
-		}
-		else {
-			positionFromRightSpecial(game, &secondLast, transcol, funcs);
-			upRight(game, swap, diagCycles);
-			shiftRightD(game, swap, horDist - 1 - secondLast.y);
-		}
-	}
-
-	// secondLast is in pre-position
-	// moving last to its preposition is not a special case
-	// if we turn the board upside down
-	
-	// set the grid transform functions
-	// returnNth and getCoord are irrelevant
+	funcs->getCoord(game, game->cols * row + col, &last);
 	IntsTransform originalTransform = funcs->transformInts;
-	if (funcs->transformInts == &doNothing) {
-		interactiveDebug("normal board");
-		funcs->transformInts = &negTransform;
-		funcs->swap = &negSwap;
+	if (!(last.x == transcol - 1 && last.y == 0)) {
+		// moving last to its preposition is not a special case
+		// if we turn the board upside down
+
+		// set the grid transform functions
+		// returnNth and getCoord are irrelevant
+		if (funcs->transformInts == &doNothing) {
+			interactiveDebug("normal board");
+			funcs->transformInts = &negTransform;
+			funcs->swap = &negSwap;
+		}
+		else {
+			interactiveDebug("transposed board");
+			// notice that transform is negTranposed but swap is transposedNeg
+			// this is because T(N(<y, x>)) does not equal N(T(<y, x>)) in general
+			// transform is NT because transform is meant to be used on real coordinates
+			// and therefore we want to replicate the actual transformation
+			// swap is TN because swap is done in transformed coordinates;
+			// we need to work backwards to get to real coordinates
+			funcs->transformInts = &negTransposedTransform;
+			funcs->swap = &transposedNegSwap;
+		}
+		Coordinate finalPos = {row, col};
+		funcs->transformInts(game, &finalPos.y, &finalPos.x);
+		finalPos.x--;
+		funcs->getCoord(game, row * game->cols + col, &last);
+		negTransform(game, &last.y, &last.x);
+		interactiveDebug("*cellRow: %i, transcol: %i, finalPos.y: %i, finalPos.x: %i", *cellRow, transcol, finalPos.y, finalPos.x);
+		interactiveDebug("moving (transformed) (%i, %i) to (%i, %i)", last.y, last.x, finalPos.y, finalPos.x);
+		moveAToB(game, &last, &finalPos, transcol, funcs);
 	}
-	else {
-		interactiveDebug("transposed board");
-		// notice that transform is negTranposed but swap is transposedNeg
-		// this is because T(N(<y, x>)) does not equal N(T(<y, x>)) in general
-		// transform is NT because transform is meant to be used on real coordinates
-		// and therefore we want to replicate the actual transformation
-		// swap is TN because swap is done in transformed coordinates;
-		// we need to work backwards to get to real coordinates
-		funcs->transformInts = &negTransposedTransform;
-		funcs->swap = &transposedNegSwap;
-	}
-	Coordinate finalPos = {row, col};
-	funcs->transformInts(game, &finalPos.y, &finalPos.x);
-	finalPos.x--;
-	funcs->getCoord(game, row * game->cols + col, &last);
-	negTransform(game, &last.y, &last.x);
-	interactiveDebug("*cellRow: %i, transcol: %i, finalPos.y: %i, finalPos.x: %i", *cellRow, transcol, finalPos.y, finalPos.x);
-	interactiveDebug("moving (transformed) (%i, %i) to (%i, %i)", last.y, last.x, finalPos.y, finalPos.x);
-	moveAToB(game, &last, &finalPos, transcol, funcs);
 
 	// both in pre-position; make the final rotation
 	interactiveDebug("final rotation");
